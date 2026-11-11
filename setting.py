@@ -1,0 +1,2 @@
+BGM_VOLUME = 1
+SE_VOLUME = 1
