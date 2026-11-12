@@ -21,13 +21,14 @@ class Game02:
         # ユーザー設定 #####
         self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
         ###################
+        self.current_house_pos = (220, 0)
+        # bool ########################
         self.is_hover = False
-        # ランダム要素の設定 ##########
-        initial_count = rand.randint(0, 3)
-        entry_count = rand.randint(5,15)
-        exit_count = rand.randint(5, initial_count + entry_count)
-        ##############################
-        anser_wotu_count = initial_count + entry_count - exit_count
+        self.is_event1_running = False
+        self.is_event2_running = False
+        # タイマー #####################
+        ###############################
+        
 
     def fill_polygon(self, pts, col):
     # 凸多角形を三角形に分割して塗りつぶして描画
@@ -41,31 +42,85 @@ class Game02:
         posx, posy = center_pos
         house_color = 13
         window_color = 10
-        self.fill_polygon([(posx, posy-30), (posx+25, posy-5),
-                           (posx+25, posy+30), (posx-25, posy+30),
-                           (posx-25, posy-5)]
-                           , house_color)
-        pyxel.rect(posx+6, posy, 6, 6, window_color)
-        pyxel.rect(posx+14, posy, 6, 6, window_color)
-        pyxel.rect(posx+6, posy+8, 6, 6, window_color)
-        pyxel.rect(posx+14, posy+8, 6, 6, window_color)
-        pyxel.rect(posx+10, posy-25, 10, 20, house_color)
-        self.fill_polygon([(posx+9, posy-26), (posx+20, posy-26),
-                           (posx+22, posy-29), (posx+7, posy-29)
-                           ], house_color)
+        self.fill_polygon([
+            (posx, posy - 75),
+            (posx + 63, posy - 12),
+            (posx + 63, posy + 75),
+            (posx - 63, posy + 75),
+            (posx - 63, posy - 12)
+        ], house_color)
+        
+        # 窓（4つ・2.5倍スケール）
+        pyxel.rect(posx + 15, posy, 15, 15, window_color)
+        pyxel.rect(posx + 35, posy, 15, 15, window_color)
+        pyxel.rect(posx + 15, posy + 20, 15, 15, window_color)
+        pyxel.rect(posx + 35, posy + 20, 15, 15, window_color)
+        
+        # 煙突（2.5倍スケール）
+        pyxel.rect(posx + 25, posy - 62, 25, 50, house_color)
+        self.fill_polygon([
+            (posx + 22, posy - 65),
+            (posx + 50, posy - 65),
+            (posx + 55, posy - 72),
+            (posx + 17, posy - 72)
+        ], house_color)
 
-    def onClick_s():
-        pyxel.mouse(False)
+    def start_game(self):
+        # ランダム要素の設定 ##########
+        self.initial_count = rand.randint(0, 6)
+        self.entry_count = rand.randint(5,15)
+        self.exit_count = rand.randint(5, self.initial_count + self.entry_count)
+        ##############################
+        self.anser_count = self.initial_count + self.entry_count - self.exit_count
+        self.state = "SETUP"
 
     def is_mouse_over_area(self, area):
         mx, my = pyxel.mouse_x, pyxel.mouse_y
         x, y, w, h = area
         return x <= mx <= x + w and y <= my <= y + h
+
+    def wotu_in(self, event):
+        event = True
+
+    def wotu_out(self, event):
+        event = True
+    
+    def wotu_in_chimney(self, event):
+        event = True
+
+    def wotu_feint(self, event):
+        event = True
     
     def update(self):
         self.is_hover = self.is_mouse_over_area(self.s_button_area)
         if self.is_hover and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            self.state = "PLAY"
+            pyxel.mouse(False)
+            self.start_game()
+        # 状態ごとの動作
+        if self.state == "PLAY":
+            event1 = rand.random()
+            event2 = rand.random()
+            # ヲツが入ってくる
+            # ヲツが出てくる
+            # ヲツが入ろうとして入らない
+            # 煙突からヲツが入っていく
+            # 発生するイベントを管理
+            if not(self.is_event1_running):
+                if event1 > 0.9:
+                    event1=0
+                elif event1 > 0.8:
+                    event1=0
+                elif event1 > 0.7:
+                    event1=0
+
+            if not(self.is_event2_running):
+                if event2 > 0.9:
+                    event2=0
+                elif event2 > 0.8:
+                    event2=0
+                elif event2 > 0.7:
+                    event2=0
+                        
 
     def draw(self):
         pyxel.cls(0)
@@ -87,9 +142,24 @@ class Game02:
             pyxel.rect(sx, sy, sw, sh, button_bg_color)
             pyxel.rectb(sx, sy, sw, sh, 5)
             pyxel.text(sx+2, sy, "START", button_text_color, self.font12)
+        elif self.state == "SETUP":
+            # summary:家の中にいるヲツの表示と家の配置
+            housex, housey = self.current_house_pos
+            # ヲツの配置(160~240, 120~146でw=h=40)
+            if self.initial_count > 0:
+                for count in range(1, self.initial_count + 1):
+                    posx = 160 + 40 * ((count - 1) % 3)
+                    posy = 120 + 26 * ((count - 1) // 3)
+                    pyxel.blt(posx, posy, 0, 0, 0, 40, 40, 0)
+            # 家の位置を更新し続ける
+            self.draw_house(self.current_house_pos)
+            if housey < 120:
+                self.current_house_pos = (housex, housey+2)
+            else :
+                self.state = "PLAY"
         elif self.state == "PLAY":
-            pyxel.blt(20, 50, 0, 0, 0, 40, 40, 0)
-            self.draw_house((80, 30))
+                self.draw_house(self.current_house_pos)
+                pyxel.text(200, 140, "READY", 7, self.font12)
 
             
 

@@ -5,7 +5,7 @@ from game02 import Game02
 
 class App:
     def __init__(self):
-        pyxel.init(165, 125, title="Minigame Station")
+        pyxel.init(440, 250, title="Minigame Station", fps=60)
         self.current_scene_id = "Title"
         self.font12 = pyxel.Font("assets/fonts/PixelMplus10-Regular.ttf", 10)
         self.scene = TitleScene(self)
