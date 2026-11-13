@@ -8,6 +8,7 @@ class App:
         pyxel.init(440, 250, title="Minigame Station", fps=60)
         self.current_scene_id = "Title"
         self.font12 = pyxel.Font("assets/fonts/PixelMplus10-Regular.ttf", 10)
+        self.font20 = pyxel.Font("assets/fonts/PixelMplus10-Regular.ttf", 20)
         self.scene = TitleScene(self)
         pyxel.run(self.update, self.draw)
 

@@ -16,16 +16,24 @@ class Game02:
     def __init__(self, app):
         self.app = app
         self.font12 = app.font12
+        self.font20 = app.font20
         pyxel.mouse(True)
         pyxel.images[0].load(0, 0, "assets/images/wotu_icon_40px.png")
         pyxel.images[0].load(40, 0, "assets/images/wotu_icon_rotate_40px.png")
         # ユーザー設定 #####
         self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
         self.confirm_ans_button_area = (300, 100, 100, 100) 
+        self.answer_count = 0
+        self.entry_rate = [0.01, 0.02, 0.035]
+        self.exit_rate = [0.015, 0.02, 0.04]
+        self.feint_rate = [0.01, 0.015, 0.06]
+        self.entry_from_chimney_rate = [0.01, 0.015, 0.03]
+        self.phase = 0
+
         ###################
-        self.current_house_pos = (220, 0) # 家の位置
+        self.current_house_pos = (220, -30) # 家の位置
         self.active_events = []  # 発生中のイベントを管理するリスト
-        self.max_events = 5  # 同時発生の上限数
+        self.max_events = 3  # 同時発生の上限数
         # bool ########################
         self.is_hover_start = False
         self.is_hover_confirm_answer = False
@@ -36,6 +44,19 @@ class Game02:
         self.max_digits = 3  # 最大桁数
         # タイマー #####################
         self.time_limit = 1200
+        self.time = 0
+        self.same_event_interval = {
+            "entry": 15,
+            "exit": 15,
+            "feint": 90,
+            "entry_from_chimney": 15,
+        }
+        self.event_cooldowns = {
+            "entry": 0,
+            "exit": 0,
+            "feint": 0,
+            "entry_from_chimney": 0,
+        }
         ###############################
         
 
@@ -80,7 +101,7 @@ class Game02:
         self.entry_count = rand.randint(5,15)
         self.exit_count = rand.randint(5, self.initial_count + self.entry_count)
         ##############################
-        self.anser_count = self.initial_count + self.entry_count - self.exit_count
+        self.answer_count = self.initial_count + self.entry_count - self.exit_count
         self.state = "SETUP"
 
     def is_mouse_over_area(self, area):
@@ -91,7 +112,11 @@ class Game02:
     def try_spawn_event(self):
         r = rand.random()
         housex, housey = self.current_house_pos
-        if r < 0.25: # ヲツが部屋に入っていく
+        entry_rate = self.entry_rate[self.phase]
+        exit_rate = self.entry_rate[self.phase] + self.exit_rate[self.phase]
+        feint_rate = self.entry_rate[self.phase] + self.exit_rate[self.phase] + self.feint_rate[self.phase]
+        entry_from_chimney_rate =self.entry_rate[self.phase] + self.exit_rate[self.phase] + self.feint_rate[self.phase] + self.entry_from_chimney_rate[self.phase]
+        if r < entry_rate and self.event_cooldowns["entry"] <= 0: # ヲツが部屋に入っていく
             ra = rand.randint(1,3)
             self.active_events.append({
                 "type": "entry",
@@ -102,20 +127,23 @@ class Game02:
                 "state": "none",
                 "is_finished": False
             })
-            self.anser_count += ra
-        elif r < 0.5: # ヲツが部屋から出ていく
+            self.answer_count += ra
+            self.event_cooldowns["entry"] = self.same_event_interval["entry"]
+        elif r < exit_rate and self.event_cooldowns["exit"] <= 0: # ヲツが部屋から出ていく
             ra = rand.randint(1,3)
-            self.active_events.append({
-                "type": "exit",
-                "amount": ra,
-                "x": housex,
-                "y": housey+20,
-                "timer": 0,
-                "state": "none",
-                "is_finished": False
-            })
-            self.anser_count -= ra
-        elif r < 0.75: # ヲツが部屋に入ろうとして入らない
+            if self.answer_count - ra > 0:
+                self.active_events.append({
+                    "type": "exit",
+                    "amount": ra,
+                    "x": housex,
+                    "y": housey+20,
+                    "timer": 0,
+                    "state": "none",
+                    "is_finished": False
+                })
+                self.answer_count -= ra
+                self.event_cooldowns["exit"] = self.same_event_interval["exit"]
+        elif r < feint_rate and self.event_cooldowns["feint"] <= 0: # ヲツが部屋に入ろうとして入らない
             ra = rand.randint(1,3)
             self.active_events.append({
                 "type": "feint",
@@ -127,19 +155,20 @@ class Game02:
                 "state": "walking_straight",
                 "is_finished": False
             })
-        elif r < 1.0: # ヲツが煙突から入っていく
+            self.event_cooldowns["feint"] = self.same_event_interval["feint"]
+        elif r < entry_from_chimney_rate and self.event_cooldowns["entry_from_chimney"] <= 0: # ヲツが煙突から入っていく
             ra = rand.randint(1,3)
             self.active_events.append({
                 "type": "entry_from_chimney",
                 "amount": ra,
                 "x": housex+17,
-                "y": -30,
+                "y": -60,
                 "timer": 0,
                 "state": "none",
                 "is_finished": False
             })
-            self.anser_count +=ra
-    
+            self.answer_count +=ra
+            self.event_cooldowns["entry_from_chimney"] = self.same_event_interval["entry_from_chimney"]
     def update(self):
         # 状態ごとの動作 
         if self.state == "INTRODUCTION":
@@ -153,6 +182,9 @@ class Game02:
             # イベント抽選 ###############################################################
             if len(self.active_events) < self.max_events and self.time_limit > 240:
                 self.try_spawn_event()
+            for ev_type in self.event_cooldowns:
+                if self.event_cooldowns[ev_type] > 0:
+                    self.event_cooldowns[ev_type] -= 1
 
             # イベントごとの更新 ##########################################################
             for ev in self.active_events:
@@ -195,10 +227,17 @@ class Game02:
             self.active_events = [
                 ev for ev in self.active_events if not ev["is_finished"]
             ]
-            if self.time_limit > 0:
+            
+            if self.time_limit < 0 :
                 self.state = "ANSWER"
                 pyxel.mouse(True)
+            elif self.time_limit < 600:
+                self.phase = 2
+            if self.time_limit < 900:
+                self.phase = 1
+        
         elif self.state == "ANSWER":
+            # 1. 数字キーの入力受付（ここは3桁未満のときだけ動かす）
             if len(self.input_text) < self.max_digits:
                 for num in range(10):
                     if pyxel.btnp(getattr(pyxel, f"KEY_{num}")) or pyxel.btnp(
@@ -209,19 +248,16 @@ class Game02:
                         else:
                             self.input_text += str(num)
 
-                # 2. Backspace で1文字削除（長押し連続削除対応）
-                if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4):
-                    self.input_text = self.input_text[:-1]
+            # 2. Backspace で1文字削除（インデントを上の if と揃える）
+            if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4):
+                self.input_text = self.input_text[:-1]
 
-                # 3. Enter で確定して self.user_answer に保存
-                if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.KEY_KP_ENTER):
-                    if self.input_text != "":
-                        self.user_answer = int(self.input_text)
-                        # ここで結果判定フェーズへ遷移させる（例: self.phase = "result"）
-                self.is_hover_confirm_answer = self.is_mouse_over_area(self.confirm_ans_button_area)
-                if self.is_hover_confirm_answer and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-                    pyxel.mouse(False)
-                    self.state = "RESULT"
+            # 3. 確定ボタンの処理（こちらも同じインデントに揃える）
+            self.is_hover_confirm_answer = self.is_mouse_over_area(self.confirm_ans_button_area)
+            if self.is_hover_confirm_answer and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT) and self.input_text != "":
+                pyxel.mouse(False)
+                self.user_answer = int(self.input_text)
+                self.state = "RESULT"
         elif self.state == "RESULT":
             a=1
 
@@ -261,7 +297,9 @@ class Game02:
             if housey < 120:
                 self.current_house_pos = (housex, housey+2)
             else :
-                self.state = "PLAY"
+                self.time += 1
+                if self.time > 90:
+                    self.state = "PLAY"
         elif self.state == "PLAY":
             for ev in self.active_events:
                 for index in range(ev["amount"]):
@@ -281,10 +319,18 @@ class Game02:
             self.draw_house(self.current_house_pos)
             pyxel.text(216, 20, str(int(self.time_limit / 60)), 7, self.font12)  
         elif self.state == "ANSWER":
+            housex, housey = self.current_house_pos
             pyxel.text(200, 20, "家の中にいるヲツは何人？(数字を入力)", 7, self.font12)
             self.draw_house(self.current_house_pos)
-
-                
-
-            
-
+            button_bg_color = 6 if self.is_hover_confirm_answer else 12
+            button_text_color = 13 if self.is_hover_confirm_answer else 7
+            cx, cy, cw, ch = self.confirm_ans_button_area
+            pyxel.rect(cx, cy, cw, ch, button_bg_color)
+            pyxel.rectb(cx, cy, cw, ch, 5)
+            pyxel.text(((2*cx+cw)/2)-10, ((2*cy+ch)/2)-10, "確定", button_text_color, self.font12)
+            pyxel.text(cx, cy - 30, self.input_text, 7, self.font20)
+        elif self.state == "RESULT":
+            if self.answer_count == self.user_answer:
+                pyxel.text(200,100,"正解！！！！", 7, self.font20)
+            else:
+                pyxel.text(200,100,"不正解；；）\n正解は" + str(self.answer_count), 7, self.font20)
