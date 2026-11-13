@@ -1,5 +1,6 @@
 # ヲツ数え
 import pyxel
+import math
 import random as rand
 # 家の座標元データ ########################################################
 # self.house_area = [(80, 20), (105, 45), (105, 80), (55, 80), (55, 45)]
@@ -15,18 +16,26 @@ class Game02:
     def __init__(self, app):
         self.app = app
         self.font12 = app.font12
-        self.state = "INTRODUCTION"
         pyxel.mouse(True)
         pyxel.images[0].load(0, 0, "assets/images/wotu_icon_40px.png")
+        pyxel.images[0].load(40, 0, "assets/images/wotu_icon_rotate_40px.png")
         # ユーザー設定 #####
         self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
+        self.confirm_ans_button_area = (300, 100, 100, 100) 
         ###################
-        self.current_house_pos = (220, 0)
+        self.current_house_pos = (220, 0) # 家の位置
+        self.active_events = []  # 発生中のイベントを管理するリスト
+        self.max_events = 5  # 同時発生の上限数
         # bool ########################
-        self.is_hover = False
-        self.is_event1_running = False
-        self.is_event2_running = False
+        self.is_hover_start = False
+        self.is_hover_confirm_answer = False
+        # 状態 #####################
+        self.state = "INTRODUCTION"
+        self.input_text = ""
+        self.user_answer = None  # 確定した回答（int）
+        self.max_digits = 3  # 最大桁数
         # タイマー #####################
+        self.time_limit = 1200
         ###############################
         
 
@@ -79,48 +88,144 @@ class Game02:
         x, y, w, h = area
         return x <= mx <= x + w and y <= my <= y + h
 
-    def wotu_in(self, event):
-        event = True
-
-    def wotu_out(self, event):
-        event = True
-    
-    def wotu_in_chimney(self, event):
-        event = True
-
-    def wotu_feint(self, event):
-        event = True
+    def try_spawn_event(self):
+        r = rand.random()
+        housex, housey = self.current_house_pos
+        if r < 0.25: # ヲツが部屋に入っていく
+            ra = rand.randint(1,3)
+            self.active_events.append({
+                "type": "entry",
+                "amount": ra,
+                "x": -20,
+                "y": housey+20,
+                "timer": 0,
+                "state": "none",
+                "is_finished": False
+            })
+            self.anser_count += ra
+        elif r < 0.5: # ヲツが部屋から出ていく
+            ra = rand.randint(1,3)
+            self.active_events.append({
+                "type": "exit",
+                "amount": ra,
+                "x": housex,
+                "y": housey+20,
+                "timer": 0,
+                "state": "none",
+                "is_finished": False
+            })
+            self.anser_count -= ra
+        elif r < 0.75: # ヲツが部屋に入ろうとして入らない
+            ra = rand.randint(1,3)
+            self.active_events.append({
+                "type": "feint",
+                "amount": 3,
+                "x": -30,
+                "y": housey+20,
+                "y_origin": housey+20,
+                "timer": 0,
+                "state": "walking_straight",
+                "is_finished": False
+            })
+        elif r < 1.0: # ヲツが煙突から入っていく
+            ra = rand.randint(1,3)
+            self.active_events.append({
+                "type": "entry_from_chimney",
+                "amount": ra,
+                "x": housex+17,
+                "y": -30,
+                "timer": 0,
+                "state": "none",
+                "is_finished": False
+            })
+            self.anser_count +=ra
     
     def update(self):
-        self.is_hover = self.is_mouse_over_area(self.s_button_area)
-        if self.is_hover and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            pyxel.mouse(False)
-            self.start_game()
-        # 状態ごとの動作
-        if self.state == "PLAY":
-            event1 = rand.random()
-            event2 = rand.random()
-            # ヲツが入ってくる
-            # ヲツが出てくる
-            # ヲツが入ろうとして入らない
-            # 煙突からヲツが入っていく
-            # 発生するイベントを管理
-            if not(self.is_event1_running):
-                if event1 > 0.9:
-                    event1=0
-                elif event1 > 0.8:
-                    event1=0
-                elif event1 > 0.7:
-                    event1=0
+        # 状態ごとの動作 
+        if self.state == "INTRODUCTION":
+            self.is_hover_start = self.is_mouse_over_area(self.s_button_area)
+            if self.is_hover_start and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+                pyxel.mouse(False)
+                self.start_game()
+        elif self.state == "PLAY":
+            housex, housey = self.current_house_pos
+            self.time_limit -=1
+            # イベント抽選 ###############################################################
+            if len(self.active_events) < self.max_events and self.time_limit > 240:
+                self.try_spawn_event()
 
-            if not(self.is_event2_running):
-                if event2 > 0.9:
-                    event2=0
-                elif event2 > 0.8:
-                    event2=0
-                elif event2 > 0.7:
-                    event2=0
-                        
+            # イベントごとの更新 ##########################################################
+            for ev in self.active_events:
+                if ev["type"] == "entry":
+                    ev["x"] += 2
+                    if ev["x"] > housex:
+                        ev["is_finished"] = True
+                elif ev["type"] == "exit":
+                    ev["x"] += 2
+                    if ev["x"] > pyxel.width + 50:
+                        ev["is_finished"] = True
+                elif ev["type"] == "feint":
+                    if ev["state"] == "walking_straight":
+                        if ev["x"] < housex - 140:
+                            ev["x"] += 2
+                        else:
+                            ev["state"] = "waiting"
+                            ev["timer"]  = 0
+                    elif ev["state"] == "waiting":
+                        ev["timer"] += 1
+                        if ev["timer"] > 40:
+                            ev["state"] = "jumping"
+                            ev["timer"] = 0
+                    elif ev["state"] == "jumping":
+                        ev["y"] =  ev["y_origin"] - (40 * abs(math.sin(ev["timer"]/10)))
+                        ev["timer"] += 1
+                        if ev["timer"] > 62:
+                            ev["state"] = "back"
+                            ev["timer"] = 0
+                    elif ev["state"] == "back":
+                        ev["x"] -= 2
+                        if ev["x"] < -30:
+                            ev["is_finished"] = True
+                elif ev["type"] == "entry_from_chimney":
+                    ev["y"] += 2
+                    if ev["y"] > housey:
+                        ev["is_finished"] = True
+            
+            # 完了したイベントの削除 #######################################################
+            self.active_events = [
+                ev for ev in self.active_events if not ev["is_finished"]
+            ]
+            if self.time_limit > 0:
+                self.state = "ANSWER"
+                pyxel.mouse(True)
+        elif self.state == "ANSWER":
+            if len(self.input_text) < self.max_digits:
+                for num in range(10):
+                    if pyxel.btnp(getattr(pyxel, f"KEY_{num}")) or pyxel.btnp(
+                        getattr(pyxel, f"KEY_KP_{num}")
+                    ):
+                        if self.input_text == "0":
+                            self.input_text = str(num)  # "05" のように先頭に0が残るのを防ぐ
+                        else:
+                            self.input_text += str(num)
+
+                # 2. Backspace で1文字削除（長押し連続削除対応）
+                if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4):
+                    self.input_text = self.input_text[:-1]
+
+                # 3. Enter で確定して self.user_answer に保存
+                if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.KEY_KP_ENTER):
+                    if self.input_text != "":
+                        self.user_answer = int(self.input_text)
+                        # ここで結果判定フェーズへ遷移させる（例: self.phase = "result"）
+                self.is_hover_confirm_answer = self.is_mouse_over_area(self.confirm_ans_button_area)
+                if self.is_hover_confirm_answer and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+                    pyxel.mouse(False)
+                    self.state = "RESULT"
+        elif self.state == "RESULT":
+            a=1
+
+
 
     def draw(self):
         pyxel.cls(0)
@@ -130,8 +235,8 @@ class Game02:
             # pyxel.rect(0, 0, pyxel.width, pyxel.height, 1)
             # pyxel.dither(1.0)
             ############################################
-            button_bg_color = 6 if self.is_hover else 12
-            button_text_color = 13 if self.is_hover else 7
+            button_bg_color = 6 if self.is_hover_start else 12
+            button_text_color = 13 if self.is_hover_start else 7
             pyxel.text(2, 2, "ヲツかぞえ", 7, self.font12)
             pyxel.text(5, 17, "家の中にいるヲツの数を計算して、\n最後に答えよう", 7, self.font12)
 
@@ -158,8 +263,28 @@ class Game02:
             else :
                 self.state = "PLAY"
         elif self.state == "PLAY":
-                self.draw_house(self.current_house_pos)
-                pyxel.text(200, 140, "READY", 7, self.font12)
+            for ev in self.active_events:
+                for index in range(ev["amount"]):
+                    if ev["type"] == "entry_from_chimney":
+                        pyxel.blt(
+                                    ev["x"],
+                                    ev["y"] + (60 * index * index - 100 * index),
+                                    0, 40, 0, 40, 40, 0
+                                )
+                    else:
+                        pyxel.blt(
+                            ev["x"] + (30 * index * index - 50 * index),
+                            ev["y"] + (-13 * index * index + 39 * index - 13),
+                            0, 0, 0, 40, 40, 0
+                        )
+            # 常に描画されるもの
+            self.draw_house(self.current_house_pos)
+            pyxel.text(216, 20, str(int(self.time_limit / 60)), 7, self.font12)  
+        elif self.state == "ANSWER":
+            pyxel.text(200, 20, "家の中にいるヲツは何人？(数字を入力)", 7, self.font12)
+            self.draw_house(self.current_house_pos)
+
+                
 
             
 
