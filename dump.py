@@ -1,56 +1,99 @@
 import pyxel
 
+
+class Card:
+
+  def __init__(self, start_x, start_y, target_x, target_y, delay, color):
+    self.start_x = start_x
+    self.start_y = start_y
+    self.target_x = target_x
+    self.target_y = target_y
+    self.x = start_x
+    self.y = start_y
+
+    self.delay = delay  # 動き出すまでの待ちフレーム数
+    self.duration = 20  # 移動にかかるフレーム数（約0.66秒）
+    self.timer = 0
+    self.color = color
+    self.is_dealt = False
+
+  def update(self):
+    if self.is_dealt:
+      return
+
+    self.timer += 1
+    # ディレイ期間中は何もしない
+    if self.timer <= self.delay:
+      return
+
+    # 進行度 t を 0.0 〜 1.0 の範囲で計算
+    elapsed = self.timer - self.delay
+    t = min(elapsed / self.duration, 1.0)
+
+    # Ease-Out Cubic（最初は速く、目標に近づくとゆっくり止まる）
+    ease_t = 1 - (1 - t) ** 3
+
+    # 現在座標の計算（線形補間）
+    self.x = self.start_x + (self.target_x - self.start_x) * ease_t
+    self.y = self.start_y + (self.target_y - self.start_y) * ease_t
+
+    if t >= 1.0:
+      self.is_dealt = True
+
+  def draw(self):
+    # カード本体と枠線を描画（幅16x高さ22）
+    pyxel.rect(self.x, self.y, 16, 22, self.color)
+    pyxel.rectb(self.x, self.y, 16, 22, 7)
+
+
 class App:
-    def __init__(self):
-        pyxel.init(160, 120, title="Pyxel UI Button Example")
-        
-        # ボタンの位置・サイズを設定
-        self.btn_x = 40
-        self.btn_y = 50
-        self.btn_w = 80
-        self.btn_h = 20
-        
-        # マウスカーソルを有効化
-        pyxel.mouse(True)
-        
-        # 状態変数
-        self.is_hovered = False
-        self.click_count = 0
 
-        pyxel.run(self.update, self.draw)
+  def __init__(self):
+    pyxel.init(160, 120, title="Card Deal Animation")
+    self.deck_x = 16
+    self.deck_y = 16
+    self.cards = []
+    self.deal_cards()
+    pyxel.run(self.update, self.draw)
 
-    def is_mouse_over(self, x, y, w, h):
-        """マウスカーソルが指定された矩形領域内にあるか判定"""
-        mx = pyxel.mouse_x
-        my = pyxel.mouse_y
-        return x <= mx <= x + w and y <= my <= y + h
+  def deal_cards(self):
+    self.cards.clear()
+    num_cards = 5
+    colors = [8, 9, 10, 11, 12]  # カードごとの色
 
-    def update(self):
-        # ホバー状態のチェック
-        self.is_hovered = self.is_mouse_over(self.btn_x, self.btn_y, self.btn_w, self.btn_h)
+    for i in range(num_cards):
+      # 手札の目標位置（横並びに配置）
+      target_x = 24 + i * 24
+      target_y = 85
+      # 1枚につき6フレームずつずらして発射
+      delay = i * 6
+      card = Card(
+          self.deck_x, self.deck_y, target_x, target_y, delay, colors[i]
+      )
+      self.cards.append(card)
 
-        # クリック処理 (左クリックが押された瞬間)
-        if self.is_hovered and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            self.click_count += 1
+  def update(self):
+    # スペースキーまたはZキーで配り直し
+    if pyxel.btnp(pyxel.KEY_SPACE) or pyxel.btnp(pyxel.KEY_Z):
+      self.deal_cards()
 
-    def draw(self):
-        pyxel.cls(0)
+    for card in self.cards:
+      card.update()
 
-        # 1. ボタンの色を変更 (ホバー時: 白, 通常時: 濃いグレー)
-        bg_color = 7 if self.is_hovered else 13
-        text_color = 0 if self.is_hovered else 7
+  def draw(self):
+    pyxel.cls(1)
 
-        # 2. ボタン枠と背景の描画
-        pyxel.rect(self.btn_x, self.btn_y, self.btn_w, self.btn_h, bg_color)
-        pyxel.rectb(self.btn_x, self.btn_y, self.btn_w, self.btn_h, 7) # 外枠
+    # 山札の描画（少しずらして重ねることで厚み表現）
+    for i in range(3):
+      pyxel.rect(self.deck_x - i, self.deck_y - i, 16, 22, 5)
+      pyxel.rectb(self.deck_x - i, self.deck_y - i, 16, 22, 7)
 
-        # 3. ボタンテキストの描画 (中央揃えの計算)
-        label = "CLICK ME"
-        text_x = self.btn_x + (self.btn_w - len(label) * 4) // 2
-        text_y = self.btn_y + (self.btn_h - 6) // 2
-        pyxel.text(text_x, text_y, label, text_color)
+    # 手札（アニメーション中のカード）の描画
+    # ※リストの後ろ（後から配られるカード）が上に重なるように描画
+    for card in self.cards:
+      card.draw()
 
-        # 情報の表示
-        pyxel.text(10, 10, f"Clicks: {self.click_count}", 10)
+    pyxel.text(45, 10, "PRESS SPACE TO DEAL", 7)
+
 
 App()

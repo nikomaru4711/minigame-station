@@ -5,7 +5,7 @@ import random as rnd
 class generateMaze:
     PATH=0
     WALL=1
-    def generate_maze(width:int, height:int):
+    def generate_maze(width:int, height:int):# 前提として開始位置が0,0の可能性あり
         # 引数チェック
         if width < 5 or height < 5:
             raise ValueError("Width and height must be at least 5.")
@@ -57,19 +57,25 @@ class Game01:
         self.state = "START"
         pyxel.mouse(True)
         # ユーザー設定 #####
-        self.block_size = 5
+        # 440, 250
+        self.maze_area = ((0,0), (pyxel.width, pyxel.height))
+        self.block_size = 8
         self.stage_color = 13
         ###################
+        (sx, sy), (tx, ty) = self.maze_area
+        self.maze_width = tx - sx
+        self.maze_height = ty - sx
 
-        if pyxel.width % self.block_size != 0 or pyxel.height % self.block_size != 0:
-            raise ValueError("横幅、縦幅はブロックサイズの倍数である必要があります。")
+        if self.maze_width % self.block_size != 0 or self.maze_height % self.block_size != 0:
+            raise ValueError("迷路の幅はブロックサイズの倍数である必要があります。")
+        # グリットの数（100pxにblocksizeが5なら20グリット）
         self.grid_width = pyxel.width / self.block_size
         self.grid_height = pyxel.height / self.block_size
 
         # スタート地点の領域を計算 ##############
-        gx_pos = pyxel.width - self.block_size*2
-        gy_pos = pyxel.height - self.block_size*2
-        self.start_area = (self.block_size, self.block_size, self.block_size, self.block_size)
+        gx_pos = tx - self.block_size*2
+        gy_pos = ty - self.block_size*2
+        self.start_area = (sx + self.block_size, sy + self.block_size, self.block_size, self.block_size)
         self.goal_area = (gx_pos, gy_pos , self.block_size, self.block_size)
         #######################################
         # コースを生成 

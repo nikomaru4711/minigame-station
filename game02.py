@@ -23,28 +23,10 @@ class Game02:
         # ユーザー設定 #####
         self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
         self.confirm_ans_button_area = (300, 100, 100, 100) 
-        self.answer_count = 0
         self.entry_rate = [0.01, 0.02, 0.035]
         self.exit_rate = [0.015, 0.02, 0.04]
         self.feint_rate = [0.01, 0.015, 0.06]
         self.entry_from_chimney_rate = [0.01, 0.015, 0.03]
-        self.phase = 0
-
-        ###################
-        self.current_house_pos = (220, -30) # 家の位置
-        self.active_events = []  # 発生中のイベントを管理するリスト
-        self.max_events = 3  # 同時発生の上限数
-        # bool ########################
-        self.is_hover_start = False
-        self.is_hover_confirm_answer = False
-        # 状態 #####################
-        self.state = "INTRODUCTION"
-        self.input_text = ""
-        self.user_answer = None  # 確定した回答（int）
-        self.max_digits = 3  # 最大桁数
-        # タイマー #####################
-        self.time_limit = 1200
-        self.time = 0
         self.same_event_interval = {
             "entry": 15,
             "exit": 15,
@@ -57,8 +39,28 @@ class Game02:
             "feint": 0,
             "entry_from_chimney": 0,
         }
+        ###################
+        self.current_house_pos = (220, -30) # 家の位置
+        self.max_events = 3  # 同時発生の上限数
+        # bool ########################
+        self.is_hover_start = False
+        self.is_hover_confirm_answer = False
+        # 状態 #####################
+        self.state = "INTRODUCTION"
+        self.input_text = ""
+        self.user_answer = None  # 確定した回答（int）
+        self.max_digits = 3  # 最大桁数
+        # タイマー #####################
+        self.time_limit = 1200
+        self.time = 0
+        # その他固定設定 ###############
+        self.answer_count = 0
+        self.phase = 0
+        self.dealt_count = 0
+        self.active_events = []  # 発生中のイベントを管理するリスト
+        self.wotu_list = [] # RESULTで配置するヲツのリスト
+        self.wotu_deck_pos = (200, 120)
         ###############################
-        
 
     def fill_polygon(self, pts, col):
     # 凸多角形を三角形に分割して塗りつぶして描画
@@ -102,6 +104,12 @@ class Game02:
         self.exit_count = rand.randint(5, self.initial_count + self.entry_count)
         ##############################
         self.answer_count = self.initial_count + self.entry_count - self.exit_count
+        self.phase = 0
+        self.dealt_count = 0
+        self.active_events = []  # 発生中のイベントを管理するリスト
+        self.wotu_list = [] # RESULTで配置するヲツのリスト
+        self.input_text = ""
+        self.user_answer = None  # 確定した回答（int）
         self.state = "SETUP"
 
     def is_mouse_over_area(self, area):
@@ -176,6 +184,8 @@ class Game02:
             if self.is_hover_start and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
                 pyxel.mouse(False)
                 self.start_game()
+        elif self.state == "SETUP":
+            a=1
         elif self.state == "PLAY":
             housex, housey = self.current_house_pos
             self.time_limit -=1
@@ -237,7 +247,7 @@ class Game02:
                 self.phase = 1
         
         elif self.state == "ANSWER":
-            # 1. 数字キーの入力受付（ここは3桁未満のときだけ動かす）
+            # 数字キーの入力受付 ########################################################
             if len(self.input_text) < self.max_digits:
                 for num in range(10):
                     if pyxel.btnp(getattr(pyxel, f"KEY_{num}")) or pyxel.btnp(
@@ -248,18 +258,51 @@ class Game02:
                         else:
                             self.input_text += str(num)
 
-            # 2. Backspace で1文字削除（インデントを上の if と揃える）
+            # Backspace で1文字削除
             if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4):
                 self.input_text = self.input_text[:-1]
 
-            # 3. 確定ボタンの処理（こちらも同じインデントに揃える）
+            # 確定ボタンの処理 ########################################################
             self.is_hover_confirm_answer = self.is_mouse_over_area(self.confirm_ans_button_area)
             if self.is_hover_confirm_answer and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT) and self.input_text != "":
                 pyxel.mouse(False)
                 self.user_answer = int(self.input_text)
+                # 家の中のヲツの生成、その後の移動座標の計算 #############################
+                self.dealt_count = 0
+                self.wotu_list.clear()
+                sx, sy = self.wotu_deck_pos
+                for i in range(self.answer_count):
+                    tx = 40 + (i % 10) * 36
+                    ty = 140 + (i // 10) * 25
+                    self.wotu_list.append({
+                        "sx": sx, "sy": sy,
+                        "tx": tx, "ty": ty,
+                        "x": sx, "y": sy,
+                        "delay": i * 4,    # 4フレームずつずらして配る
+                        "duration": 20,    # 20フレームかけて移動
+                        "timer": 0,
+                    })
+
                 self.state = "RESULT"
         elif self.state == "RESULT":
-            a=1
+            housex, housey = self.current_house_pos
+            # 家の中にヲツを配置(1対のみ。山札のようなイメージ)
+
+            if housey < -80:
+                count = 0
+                # 山札のヲツを一体ずつ並べていく（self.answer_count数）
+                for w in self.wotu_list:
+                    w["timer"] += 1
+                    if w["timer"] > w["delay"]:
+                        count += 1
+                        t = min((w["timer"] - w["delay"]) / w["duration"], 1.0)
+                        ease_t = 1 - (1 - t) ** 3  # Ease-Out（減速しながら停止）
+                        w["x"] = w["sx"] + (w["tx"] - w["sx"]) * ease_t
+                        w["y"] = w["sy"] + (w["ty"] - w["sy"]) * ease_t  
+                self.dealt_count = count
+            else:
+                self.current_house_pos = (housex, housey-4)
+
 
 
 
@@ -300,6 +343,7 @@ class Game02:
                 self.time += 1
                 if self.time > 90:
                     self.state = "PLAY"
+                    self.time = 0
         elif self.state == "PLAY":
             for ev in self.active_events:
                 for index in range(ev["amount"]):
@@ -330,7 +374,22 @@ class Game02:
             pyxel.text(((2*cx+cw)/2)-10, ((2*cy+ch)/2)-10, "確定", button_text_color, self.font12)
             pyxel.text(cx, cy - 30, self.input_text, 7, self.font20)
         elif self.state == "RESULT":
-            if self.answer_count == self.user_answer:
-                pyxel.text(200,100,"正解！！！！", 7, self.font20)
-            else:
-                pyxel.text(200,100,"不正解；；）\n正解は" + str(self.answer_count), 7, self.font20)
+            housex, housey = self.current_house_pos
+            if housey < -80:
+                dx, dy = self.wotu_deck_pos
+                pyxel.text(dx+14, dy-24, str(self.dealt_count), 7, self.font20)
+
+
+            if self.answer_count > 0:
+                for w in self.wotu_list:
+                    pyxel.blt(w["x"], w["y"], 0, 0, 0, 40, 40, 0)
+            self.draw_house(self.current_house_pos)
+
+            if self.dealt_count == self.answer_count:
+                self.time += 1
+                if self.time > 90: # タイマを初期化するとtextが点滅してしまうので、初期化していない
+                    if self.answer_count == self.user_answer:
+                        pyxel.text(220,60,"○", 12, self.font20)
+                
+                    else:
+                        pyxel.text(220,60,"×", 8, self.font20)
