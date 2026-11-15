@@ -1,6 +1,7 @@
 # ヲツ数え
 import pyxel
 import math
+from module import GameModule
 import random as rand
 # 家の座標元データ ########################################################
 # self.house_area = [(80, 20), (105, 45), (105, 80), (55, 80), (55, 45)]
@@ -12,11 +13,10 @@ import random as rand
 # self.house_chimney2 = [(89, 24), (101, 24), (103, 21), (87, 21)]
 ##########################################################################
 
-class Game02:
+class Game02(GameModule):
     def __init__(self, app):
+        super().__init__()
         self.app = app
-        self.font12 = app.font12
-        self.font20 = app.font20
         pyxel.mouse(True)
         pyxel.images[0].load(0, 0, "assets/images/wotu_icon_40px.png")
         pyxel.images[0].load(40, 0, "assets/images/wotu_icon_rotate_40px.png")
@@ -62,14 +62,6 @@ class Game02:
         self.wotu_deck_pos = (200, 120)
         ###############################
 
-    def fill_polygon(self, pts, col):
-    # 凸多角形を三角形に分割して塗りつぶして描画
-        x0, y0 = pts[0]
-        for i in range(1, len(pts) - 1):
-            x1, y1 = pts[i]
-            x2, y2 = pts[i + 1]
-            pyxel.tri(x0, y0, x1, y1, x2, y2, col)
-
     def draw_house (self, center_pos):
         posx, posy = center_pos
         house_color = 13
@@ -111,11 +103,6 @@ class Game02:
         self.input_text = ""
         self.user_answer = None  # 確定した回答（int）
         self.state = "SETUP"
-
-    def is_mouse_over_area(self, area):
-        mx, my = pyxel.mouse_x, pyxel.mouse_y
-        x, y, w, h = area
-        return x <= mx <= x + w and y <= my <= y + h
 
     def try_spawn_event(self):
         r = rand.random()
@@ -185,7 +172,7 @@ class Game02:
                 pyxel.mouse(False)
                 self.start_game()
         elif self.state == "SETUP":
-            a=1
+            pass
         elif self.state == "PLAY":
             housex, housey = self.current_house_pos
             self.time_limit -=1
@@ -316,16 +303,16 @@ class Game02:
             ############################################
             button_bg_color = 6 if self.is_hover_start else 12
             button_text_color = 13 if self.is_hover_start else 7
-            pyxel.text(2, 2, "ヲツかぞえ", 7, self.font12)
-            pyxel.text(5, 17, "家の中にいるヲツの数を計算して、\n最後に答えよう", 7, self.font12)
+            pyxel.text(2, 2, "ヲツかぞえ", 7, self.font10)
+            pyxel.text(5, 17, "家の中にいるヲツの数を計算して、\n最後に答えよう", 7, self.font10)
 
-            pyxel.text(85, 50, "←ヲツ", 7, self.font12)            
+            pyxel.text(85, 50, "←ヲツ", 7, self.font10)            
             pyxel.blt(40, 45, 0, 0, 0, 40, 40, 0)
             
             sx, sy, sw, sh = self.s_button_area
             pyxel.rect(sx, sy, sw, sh, button_bg_color)
             pyxel.rectb(sx, sy, sw, sh, 5)
-            pyxel.text(sx+2, sy, "START", button_text_color, self.font12)
+            pyxel.text(sx+2, sy, "START", button_text_color, self.font10)
         elif self.state == "SETUP":
             # summary:家の中にいるヲツの表示と家の配置
             housex, housey = self.current_house_pos
@@ -361,17 +348,17 @@ class Game02:
                         )
             # 常に描画されるもの
             self.draw_house(self.current_house_pos)
-            pyxel.text(216, 20, str(int(self.time_limit / 60)), 7, self.font12)  
+            pyxel.text(216, 20, str(int(self.time_limit / 60)), 7, self.font10)  
         elif self.state == "ANSWER":
             housex, housey = self.current_house_pos
-            pyxel.text(200, 20, "家の中にいるヲツは何人？(数字を入力)", 7, self.font12)
+            pyxel.text(200, 20, "家の中にいるヲツは何人？(数字を入力)", 7, self.font10)
             self.draw_house(self.current_house_pos)
             button_bg_color = 6 if self.is_hover_confirm_answer else 12
             button_text_color = 13 if self.is_hover_confirm_answer else 7
             cx, cy, cw, ch = self.confirm_ans_button_area
             pyxel.rect(cx, cy, cw, ch, button_bg_color)
             pyxel.rectb(cx, cy, cw, ch, 5)
-            pyxel.text(((2*cx+cw)/2)-10, ((2*cy+ch)/2)-10, "確定", button_text_color, self.font12)
+            pyxel.text(((2*cx+cw)/2)-10, ((2*cy+ch)/2)-10, "確定", button_text_color, self.font10)
             pyxel.text(cx, cy - 30, self.input_text, 7, self.font20)
         elif self.state == "RESULT":
             housex, housey = self.current_house_pos

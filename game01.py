@@ -1,11 +1,12 @@
 # イライラ棒
 import pyxel
+from module import GameModule
 import random as rnd
 
 class generateMaze:
     PATH=0
     WALL=1
-    def generate_maze(width:int, height:int):# 前提として開始位置が0,0の可能性あり
+    def generate_maze(width:int, height:int):
         # 引数チェック
         if width < 5 or height < 5:
             raise ValueError("Width and height must be at least 5.")
@@ -28,7 +29,7 @@ class generateMaze:
                 maze[y][x] = generateMaze.WALL\
                 #倒せるまで繰り返す
                 while True:
-                    # 倒す方向を決める（1行目🍻上にも倒せる）
+                    # 倒す方向を決める（1行目は上にも倒せる）
                     if y == 2:
                         direction = rnd.randint(0, 3)
                     else:
@@ -38,71 +39,90 @@ class generateMaze:
                     # 一旦倒す
                     match direction:
                         case 0: #上
-                            wall_y -= 1
+                            wall_x -= 1
                         case 1: #右
                             wall_x += 1
                         case 2: #下
                             wall_y += 1
                         case 3: #左
-                            wall_x -= 1
+                            wall_y -= 1
                     # 倒せるか判定
                     if maze[wall_y][wall_x] == generateMaze.PATH:
                         maze[wall_y][wall_x] = generateMaze.WALL
                         break
         return maze
 
-class Game01:
+class Game01(GameModule):
     def __init__(self, app):
-        self.font12 = app.font12
-        self.state = "START"
+        super().__init__()
+        self.app = app  # ← 追加（Qキー用）
         pyxel.mouse(True)
         # ユーザー設定 #####
-        # 440, 250
-        self.maze_area = ((0,0), (pyxel.width, pyxel.height))
-        self.block_size = 8
+        self.block_size = 10
         self.stage_color = 13
+        # 迷路の開始位置とグリッド数（必ず「奇数」にすると壁とピッタリ合います）
+        sx, sy = 50, 50
+        self.grid_width = 37
+        self.grid_height = 19
+        self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
         ###################
-        (sx, sy), (tx, ty) = self.maze_area
-        self.maze_width = tx - sx
-        self.maze_height = ty - sx
+        self.is_hover_start = False
+        self.s_button_area
+        self.state = "INTRODUCTION"
+        self.maze_area = (
+            (sx, sy),
+            (
+                sx + self.grid_width * self.block_size,
+                sy + self.grid_height * self.block_size,
+            ),
+        )
 
-        if self.maze_width % self.block_size != 0 or self.maze_height % self.block_size != 0:
-            raise ValueError("迷路の幅はブロックサイズの倍数である必要があります。")
-        # グリットの数（100pxにblocksizeが5なら20グリット）
-        self.grid_width = pyxel.width / self.block_size
-        self.grid_height = pyxel.height / self.block_size
+        # スタートとゴールの領域を計算（通路の四隅に配置）
+        self.start_area = (
+            sx + self.block_size,
+            sy + self.block_size,
+            self.block_size,
+            self.block_size,
+        )
+        gx_pos = sx + (self.grid_width - 2) * self.block_size
+        gy_pos = sy + (self.grid_height - 2) * self.block_size
+        self.goal_area = (gx_pos, gy_pos, self.block_size, self.block_size)
 
-        # スタート地点の領域を計算 ##############
-        gx_pos = tx - self.block_size*2
-        gy_pos = ty - self.block_size*2
-        self.start_area = (sx + self.block_size, sy + self.block_size, self.block_size, self.block_size)
-        self.goal_area = (gx_pos, gy_pos , self.block_size, self.block_size)
-        #######################################
-        # コースを生成 
-        self.create_course()
+        # コースを生成
+        self.maze = generateMaze.generate_maze(
+            self.grid_width, self.grid_height
+        )
 
-    def create_course(self):
-        # 迷路を生成
-        maze = generateMaze.generate_maze(int(self.grid_width), int(self.grid_height))
-        # imeges0に迷路情報を追加
-        img = pyxel.images[0]
-        img.cls(0)
+    def draw_maze(self):
+        # 迷路を直接描画
+        (sx, sy), _ = self.maze_area
+        for y in range(self.grid_height):
+            for x in range(self.grid_width):
+                if self.maze[y][x] == generateMaze.WALL:
+                    pyxel.rect(
+                        sx + x * self.block_size,
+                        sy + y * self.block_size,
+                        self.block_size,
+                        self.block_size,
+                        self.stage_color,
+                    )
 
-        for x in range(int(self.grid_width)):
-            for y in range(int(self.grid_height)):
-                if maze[y][x] == generateMaze.WALL:
-                    img.rect(x * self.block_size, y * self.block_size, self.block_size, self.block_size, self.stage_color)
+        # スタート、ゴール
+        st_x, st_y, sw, sh = self.start_area
+        gx, gy, gw, gh = self.goal_area
+        pyxel.rect(st_x, st_y, sw, sh, 11)
+        pyxel.rect(gx, gy, gw, gh, 14)
 
 
     def update(self):
-        if(pyxel.btnp(pyxel.KEY_Q)):
-            self.app.change_scene("Title")
-            return "Title"
-        
         mx, my = pyxel.mouse_x, pyxel.mouse_y
-
-        if self.state == "START":
-            # スタートエリア内でクリックするとゲーム開始
+        # 状態別の処理
+        if self.state == "INTRODUCTION":
+            self.is_hover_start = self.is_mouse_over_area(self.s_button_area)
+            if self.is_hover_start and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+                pyxel.mouse(True)
+                self.state = "SETUP"
+        elif self.state == "SETUP":
             sx, sy, sw, sh = self.start_area
             if (
                 sx <= mx <= sx + sw
@@ -112,8 +132,8 @@ class Game01:
                 self.state = "PLAY"
 
         elif self.state == "PLAY":
-            # 壁との接触判定
-            if pyxel.images[0].pget(mx, my) == self.stage_color:
+            # 画面上のピクセル色を見て壁との接触判定
+            if pyxel.pget(mx, my) == self.stage_color:
                 self.state = "GAMEOVER"
 
             # ゴールエリア到達判定
@@ -121,32 +141,38 @@ class Game01:
             if gx <= mx <= gx + gw and gy <= my <= gy + gh:
                 self.state = "CLEAR"
 
-        elif self.state in ("GAMEOVER", "CLEAR"):
-            # リトライ
-            if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-                # self.create_course()
-                self.state = "START"
-        return None
-        
+            elif self.state in ("GAMEOVER", "CLEAR"):
+                if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+                    # コースの再生成
+                    self.maze = generateMaze.generate_maze(
+                        self.grid_width, self.grid_height
+                    )
+                    self.state = "START"
+            return None
 
     def draw(self):
         pyxel.cls(0)
-        
-        # 迷路
-        pyxel.blt(0, 0, 0, 0, 0, pyxel.width, pyxel.height)
+        (sx, sy), _ = self.maze_area
 
-        # スタート、ゴール
-        sx, sy, sw, sh = self.start_area
-        gx, gy, gw, gh = self.goal_area
-        pyxel.rect(sx, sy, sw, sh, 14)
-        pyxel.rect(gx, gy, gw, gh, 14)
+        if self.state == "INTRODUCTION":
+            button_bg_color = 6 if self.is_hover_start else 12
+            button_text_color = 13 if self.is_hover_start else 7
+            pyxel.text(2, 2, "イライラ棒", 7, self.font10)
+            pyxel.text(5, 17, "壁に当たらずにゴールまでマウスを動かそう！", 7, self.font10)
+            
+            sx, sy, sw, sh = self.s_button_area
+            pyxel.rect(sx, sy, sw, sh, button_bg_color)
+            pyxel.rectb(sx, sy, sw, sh, 5)
+            pyxel.text(sx+2, sy, "START", button_text_color, self.font10)
+        elif self.state == "SETUP":
+            self.draw_maze()
+            pyxel.text(50, 30, "STARTをクリックして開始", 7, self.font10)
+        elif self.state == "PLAY":
+            self.draw_maze()
 
-
-        # 状態毎のメッセージ
-        if self.state == "START":
-            pyxel.text(50, 30, "STARTSをクリックして開始", 7, self.font12)
-            pyxel.rect(gx, gy, gw, gh, 7)
         elif self.state == "GAMEOVER":
-            pyxel.text(50, 30, "GAME OVER", 7, self.font12)
+            pyxel.text(50, 30, "GAME OVER", 8, self.font10)
+            self.draw_maze()
         elif self.state == "CLEAR":
-            pyxel.text(50, 30, "CLEAR!", 7, self.font12)
+            pyxel.text(50, 30, "CLEAR!", 10, self.font10)
+            self.draw_maze()

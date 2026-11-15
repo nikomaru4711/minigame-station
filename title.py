@@ -1,9 +1,9 @@
 import pyxel
+from module import GameModule
 
-class TitleScene:
+class TitleScene(GameModule):
     def __init__(self, app):
         self.app = app
-        self.font12 = app.font12
         
     def update(self):
         if pyxel.btnp(pyxel.KEY_1):
