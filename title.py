@@ -12,6 +12,9 @@ class TitleScene(GameModule):
         if pyxel.btnp(pyxel.KEY_2):
             self.app.change_scene("Game02")
             return "Game02"
+        if pyxel.btnp(pyxel.KEY_3):
+                    self.app.change_scene("Game03")
+                    return "Game03"
         return None
 
     def draw(self):

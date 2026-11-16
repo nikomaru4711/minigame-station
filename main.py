@@ -2,6 +2,7 @@ import pyxel
 from title import TitleScene
 from game01 import Game01
 from game02 import Game02
+from game03 import Game03
 
 class App:
     def __init__(self):
@@ -18,6 +19,8 @@ class App:
             self.scene = Game01(self)
         elif next_scene_id == "Game02":
             self.scene = Game02(self)
+        elif next_scene_id == "Game03":
+            self.scene = Game03(self)
 
     def update(self):
         next_scene = self.scene.update()
