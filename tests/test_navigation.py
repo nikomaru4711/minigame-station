@@ -276,7 +276,7 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(hud.value, 125)
         self.assertEqual(hud.display_value, 125)
 
-    def test_score_drawing_is_static_and_under_boss_bar(self):
+    def test_score_is_hidden_in_game_and_centered_in_result(self):
         self.app.change_scene("Game03")
         self.app.add_score(10)
         self.app.score_hud.update()
@@ -284,9 +284,20 @@ class NavigationTests(unittest.TestCase):
         with patch.object(pyxel, "text") as text:
             self.app.draw()
             self.app.draw()
-        scores = [call for call in text.call_args_list if call.args[2].startswith("スコア ")]
+        self.assertFalse(any(call.args[2] == "スコア" for call in text.call_args_list))
+        self.finish(False)
+        with patch.object(pyxel, "text") as text:
+            self.app.draw()
+            self.app.draw()
+        scores = [call for call in text.call_args_list if call.args[2] == "スコア"]
         self.assertEqual(len(scores), 2)
-        self.assertTrue(all(call.args[1] == 24 for call in scores))
+        hud = self.app.score_hud
+        self.assertTrue(all(call.args[0] == 220 - hud.font20.text_width("スコア") // 2
+                            and call.args[1] == 86 and call.args[4] is hud.font20 for call in scores))
+        values = [call for call in text.call_args_list if call.args[2] == "0"]
+        self.assertEqual(len(values), 2)
+        self.assertTrue(all(call.args[0] == 220 - hud.font20.text_width("0") // 2
+                            and call.args[1] == 110 for call in values))
         self.assertEqual(self.app.score_hud.frame, frame)
         self.app.change_scene("Game01")
         self.assertEqual(self.app.score_hud.value, 0)
@@ -538,6 +549,22 @@ class NavigationTests(unittest.TestCase):
             self.click(self.app.next_button)
         self.assertEqual(self.app.current_scene_id, "Result")
         self.assertEqual(self.app.score_hud.value, 944)
+        self.assertEqual(self.app.game_scores, {
+            "Game01": {"base": 200, "bonus": 300},
+            "Game02": {"base": 200, "bonus": 0},
+            "Game03": {"base": 200, "bonus": 44},
+        })
+        view = self.app.scene.breakdown
+        self.assertEqual(view.display_total, 0)
+        # 途中の加点演出が完了済みでも、最終リザルトで内訳を再生する。
+        for _ in range(180):
+            self.app.update()
+        self.assertEqual(view.display_total, 944)
+        self.assertEqual(self.app.score_hud.value, 944)
+        self.app.change_scene("Title")
+        self.app.change_scene("Attack")
+        self.assertTrue(all(parts == {"base": 0, "bonus": 0}
+                            for parts in self.app.game_scores.values()))
 
     def test_game02_waits_for_answer_animation_including_zero(self):
         for correct in (False, True):

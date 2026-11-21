@@ -1,6 +1,7 @@
 import pyxel
 from ui import MenuScene
 from game_select import GAME_IDS
+from attack_breakdown import AttackBreakdown
 
 
 class ResultScene(MenuScene):
@@ -23,15 +24,22 @@ class ResultScene(MenuScene):
             heading = "クリア！"
             choices = [("タイトルに戻る", "Title")]
         super().__init__(app, heading, choices)
+        self.breakdown = AttackBreakdown(app.game_scores) if attack else None
         for i, (button, _) in enumerate(self.buttons):
             button.area = (100, 210 - (len(self.buttons) - 1 - i) * 36, 240, 28)
 
+    def update(self):
+        if self.breakdown is not None:
+            self.breakdown.update()
+        return super().update()
+
     def draw(self):
         super().draw()
+        if self.breakdown is not None:
+            self.breakdown.draw(self.font10, self.font20)
+        else:
+            self.app.score_hud.draw()
         category = "Attack" if self.app.play_mode == "attack" else self.app.active_game_id
         status = self.app.ranking_service.status.get(category, "")
         if status:
-            pyxel.text(30, 151, status, 6, self.font10)
-        if self.app.play_mode == "attack":
-            index = GAME_IDS.index(self.app.active_game_id) + 1
-            pyxel.text(170, 85, f"ミニゲーム {index} / 3", 7, self.font10)
+            pyxel.text(30, 192 if self.breakdown is not None else 151, status, 6, self.font10)

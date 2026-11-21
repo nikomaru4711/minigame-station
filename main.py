@@ -30,6 +30,7 @@ class App:
         self.name_error = ""
         self.run_player_name = self.player.name
         self.game_score = 0
+        self.game_scores = {game_id: {"base": 0, "bonus": 0} for game_id in GAME_IDS}
         self._game_submitted = False
         self.play_mode = "single"
         self.active_game_id = None
@@ -49,6 +50,7 @@ class App:
             self.play_mode = "attack"
             self.run_player_name = self.player.name
             self.score_hud.reset()
+            self.game_scores = {game_id: {"base": 0, "bonus": 0} for game_id in GAME_IDS}
             next_scene_id = GAME_IDS[0]
         elif next_scene_id == "Retry":
             next_scene_id = self.active_game_id
@@ -67,7 +69,9 @@ class App:
             if self.play_mode == "single":
                 self.score_hud.reset()
                 self.run_player_name = self.player.name
+                self.game_scores = {game_id: {"base": 0, "bonus": 0} for game_id in GAME_IDS}
             self.game_score = 0
+            self.game_scores[next_scene_id] = {"base": 0, "bonus": 0}
             self._game_submitted = False
             self.active_game_id = next_scene_id
             self.game_cleared = False
@@ -95,10 +99,13 @@ class App:
             return None
         return "Result"
 
-    def add_score(self, amount):
+    def add_score(self, amount, *, bonus=False):
         """点数は即時に確定し、表示の加算演出を順番に予約する。"""
         self.score_hud.add(amount)
         self.game_score += amount
+        if self.active_game_id in self.game_scores:
+            part = "bonus" if bonus else "base"
+            self.game_scores[self.active_game_id][part] += amount
 
     def set_player_name(self, name):
         try:
@@ -126,10 +133,6 @@ class App:
 
     def draw(self):
         self.scene.draw()
-        if self.current_scene_id in GAME_IDS or self.current_scene_id == "Result":
-            # ヲツベーダーでは画面上部のボスHPバーより下に置く。
-            y = 24 if self.current_scene_id == "Game03" else 4
-            self.score_hud.draw(y)
         if self.attack_finished:
             self.next_button.draw(self.scene.font10)
 

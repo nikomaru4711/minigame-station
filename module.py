@@ -18,7 +18,7 @@ class GameModule:
         self._score_awarded = True
         self.app.add_score(base)
         if bonus > 0:
-            self.app.add_score(bonus)
+            self.app.add_score(bonus, bonus=True)
     
     def fill_polygon(self, pts, col):
         # 凸多角形を三角形に分割して塗りつぶして描画する

@@ -60,19 +60,17 @@ class ScoreHUD(GameModule):
         t = min((self.frame - self.ENTER_FRAMES) / self.MERGE_FRAMES, 1)
         return 0, 14 * (1 - t * t), 1
 
-    def draw(self, y=4):
-        right = pyxel.width - 8
-        value_right = right - 24
+    def draw(self, y=110):
+        center = pyxel.width // 2
         value = str(self.display_value)
-        label = "スコア " + value
-        width = max(130, self.font10.text_width(label) + 32)
-        pyxel.rect(right - width, y - 2, width + 4, 30, 0)
-        pyxel.text(value_right - self.font10.text_width(label), y, label, 7, self.font10)
+        label = "スコア"
+        pyxel.text(center - self.font20.text_width(label) // 2, y - 24, label, 7, self.font20)
+        value_width = self.font20.text_width(value)
+        pyxel.text(center - value_width // 2, y, value, 10, self.font20)
         if self.amount is not None and self.frame <= self.ENTER_FRAMES + self.MERGE_FRAMES:
             dx, dy, opacity = self.bonus_pose()
             text = f"+{self.amount}"
-            # 右からの移動中も文字全体を画面内に収める。
-            x = value_right - self.font10.text_width(text) + dx
+            x = center + value_width // 2 - self.font10.text_width(text) + dx
             pyxel.dither(opacity)
-            pyxel.text(x, y + dy, text, 10, self.font10)
+            pyxel.text(x, y + dy * 2, text, 10, self.font10)
             pyxel.dither(1)
