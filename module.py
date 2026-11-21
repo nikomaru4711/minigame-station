@@ -6,6 +6,16 @@ class GameModule:
       font_path = str(Path(__file__).resolve().parent / "assets/fonts/PixelMplus10-Regular.ttf")
       self.font10 = pyxel.Font(font_path, 10)
       self.font20 = pyxel.Font(font_path, 20)
+      self._score_awarded = False
+
+    def award_clear_score(self, bonus=0):
+        """クリア基本点とボーナスを別々に予約し、二重加点を防ぐ。"""
+        if self._score_awarded:
+            return
+        self._score_awarded = True
+        self.app.add_score(200)
+        if bonus > 0:
+            self.app.add_score(bonus)
     
     def fill_polygon(self, pts, col):
         # 凸多角形を三角形に分割して塗りつぶして描画する

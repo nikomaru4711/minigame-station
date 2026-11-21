@@ -16,9 +16,8 @@ class ScoreHUD(GameModule):
         self.reset()
 
     def reset(self):
-        # 点数がまだ提供されていない間は、仮の点数ではなく --- を表示する。
-        self.value = None
-        self.display_value = None
+        self.value = 0
+        self.display_value = 0
         self.pending = deque()
         self.amount = None
         self.frame = 0
@@ -30,8 +29,6 @@ class ScoreHUD(GameModule):
     def add(self, amount):
         if type(amount) is not int or amount < 0:
             raise ValueError("Score addition must be a non-negative integer")
-        if self.value is None:
-            self.value = self.display_value = 0
         if amount:
             self.pending.append(amount)
 
@@ -63,9 +60,9 @@ class ScoreHUD(GameModule):
     def draw(self, y=4):
         right = pyxel.width - 8
         value_right = right - 24
-        value = "---" if self.display_value is None else str(self.display_value)
+        value = str(self.display_value)
         label = "スコア " + value
-        width = max(130, self.font10.text_width(label) + 8)
+        width = max(130, self.font10.text_width(label) + 32)
         pyxel.rect(right - width, y - 2, width + 4, 30, 0)
         pyxel.text(value_right - self.font10.text_width(label), y, label, 7, self.font10)
         if self.amount is not None and self.frame <= self.ENTER_FRAMES + self.MERGE_FRAMES:

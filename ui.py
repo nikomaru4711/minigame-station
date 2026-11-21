@@ -33,7 +33,13 @@ class MenuScene(GameModule):
             for i, (label, target) in enumerate(choices)
         ]
 
+    @property
+    def buttons_enabled(self):
+        return True
+
     def update(self):
+        if not self.buttons_enabled:
+            return None
         for button, target in self.buttons:
             if button.clicked():
                 return target
@@ -43,5 +49,6 @@ class MenuScene(GameModule):
         pyxel.cls(0)
         pyxel.text((440 - self.font20.text_width(self.heading)) // 2,
                    20, self.heading, 10, self.font20)
-        for button, _ in self.buttons:
-            button.draw(self.font10)
+        if self.buttons_enabled:
+            for button, _ in self.buttons:
+                button.draw(self.font10)

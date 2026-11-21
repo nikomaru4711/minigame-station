@@ -138,6 +138,9 @@ class Game03(GameModule):
         self.player_y = SCREEN_HEIGHT - 22
         self.player_speed = 3.5
         self.shoot_cooldown = 0
+        self.shots_fired = 0
+        self.shots_hit = 0
+        self._score_awarded = False
 
         # ボスと弾リスト
         self.boss = Boss()
@@ -162,6 +165,10 @@ class Game03(GameModule):
 
         # 2. ゲームオーバー / クリア画面
         if self.state != "PLAY":
+            if self.state == "CLEAR":
+                # 命中率は0〜100%。(命中率 / 10)^2 を端数切り捨てで計算。
+                bonus = 100 * self.shots_hit ** 2 // self.shots_fired ** 2 if self.shots_fired else 0
+                self.award_clear_score(bonus)
             return self.app.finish_game(self.state == "CLEAR")
 
         # 3. プレイ中の更新処理
@@ -187,6 +194,7 @@ class Game03(GameModule):
             bx = self.player_x + self.player_w // 2 - 1
             by = self.player_y - 7
             self.player_bullets.append(Bullet(bx, by, 0.0, -5.5, 7))
+            self.shots_fired += 1
             self.shoot_cooldown = 10
             self.app.audio.play_se(0, 0)
 
@@ -255,6 +263,7 @@ class Game03(GameModule):
                 b.h,
             ):
                 b.is_alive = False
+                self.shots_hit += 1
                 self.boss.hp = max(0, self.boss.hp - 2)
                 self.boss.hit_flash_timer = 3
                 self.app.audio.play_se(1, 1)
@@ -262,7 +271,8 @@ class Game03(GameModule):
                 if self.boss.hp == 0:
                     self.state = "CLEAR"
                     self.app.audio.play_se(0, 2)
-                    break
+                    # 撃破したフレームの敵弾でクリアが失敗に上書きされないようにする。
+                    return
 
         # ボスの弾 vs 自機（中心寄りの小さめ判定）
         for b in self.enemy_bullets:

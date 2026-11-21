@@ -4,7 +4,11 @@ from game_select import GAME_IDS
 
 
 class ResultScene(MenuScene):
-    """将来のスコア表示フェーズが終わった後に表示する終了メニュー。"""
+    """加点演出の完了後に操作できる終了メニュー。"""
+
+    @property
+    def buttons_enabled(self):
+        return not self.app.score_hud.animating
 
     def __init__(self, app):
         attack = app.play_mode == "attack"

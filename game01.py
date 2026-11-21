@@ -69,6 +69,7 @@ class Game01(GameModule):
         self.is_hover_start = False
         self.s_button_area
         self.state = "INTRODUCTION"
+        self.elapsed_frames = 0
         self.maze_area = (
             (sx, sy),
             (
@@ -129,12 +130,15 @@ class Game01(GameModule):
                 and sy <= my <= sy + sh
                 and pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
             ):
+                self.elapsed_frames = 0
                 self.state = "PLAY"
 
         elif self.state == "PLAY":
+            self.elapsed_frames += 1
             # 画面上のピクセル色を見て壁との接触判定
             if pyxel.pget(mx, my) == self.stage_color:
                 self.state = "GAMEOVER"
+                return None
 
             # ゴールエリア到達判定
             gx, gy, gw, gh = self.goal_area
@@ -142,6 +146,10 @@ class Game01(GameModule):
                 self.state = "CLEAR"
 
         elif self.state in ("GAMEOVER", "CLEAR"):
+            if self.state == "CLEAR":
+                # 秒 = フレーム数 / fps。整数除算でボーナスの端数を切り捨てる。
+                bonus = 3000 * self.app.fps // max(self.elapsed_frames, 1)
+                self.award_clear_score(bonus)
             return self.app.finish_game(self.state == "CLEAR")
         return None
 

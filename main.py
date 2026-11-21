@@ -15,10 +15,11 @@ from ui import Button
 
 class App:
     def __init__(self):
-        pyxel.init(440, 250, title="Minigame Station", fps=60)
+        self.fps = 60
+        pyxel.init(440, 250, title="Minigame Station", fps=self.fps)
         self.settings = Settings()
         self.audio = Audio(self.settings)
-        # スコア算出・記録は未実装。将来登録された記録をランキングで表示する。
+        # ランキングへのユーザー名付き記録登録は未実装。
         self.rankings = {key: [] for key in ("Attack", *GAME_IDS)}
         self.play_mode = "single"
         self.active_game_id = None
@@ -70,7 +71,7 @@ class App:
         return "Result"
 
     def add_score(self, amount):
-        """将来のスコア算出処理から呼ぶ。連続加点は順番に演出する。"""
+        """各ゲームから加点を受け取り、順番に演出する。"""
         self.score_hud.add(amount)
 
     def update(self):

@@ -292,6 +292,8 @@ class Game02(GameModule):
                 if self.dealt_count == self.answer_count:
                     self.time += 1
                     if self.time > 180:
+                        if self.answer_count == self.user_answer:
+                            self.award_clear_score()
                         return self.app.finish_game(self.answer_count == self.user_answer)
             else:
                 self.current_house_pos = (housex, housey-4)

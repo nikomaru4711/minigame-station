@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pyxel
 from main import App
+from game03 import Bullet
 from setting import Settings
 
 
@@ -139,11 +140,11 @@ class NavigationTests(unittest.TestCase):
         self.assertFalse(self.app.attack_finished)
         self.click(self.app.scene.buttons[0][0])
         self.app.change_scene("Attack")
-        self.assertIsNone(self.app.score_hud.value)
+        self.assertEqual(self.app.score_hud.value, 0)
 
     def test_score_fades_in_then_merges_then_counts_up_in_order(self):
         hud = self.app.score_hud
-        self.assertIsNone(hud.display_value)
+        self.assertEqual(hud.display_value, 0)
         self.app.add_score(100)
         self.app.add_score(25)
         self.assertEqual(hud.display_value, 0)
@@ -185,7 +186,7 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(all(call.args[1] == 24 for call in scores))
         self.assertEqual(self.app.score_hud.frame, frame)
         self.app.change_scene("Game01")
-        self.assertIsNone(self.app.score_hud.value)
+        self.assertEqual(self.app.score_hud.value, 0)
 
     def test_single_game_can_retry_after_failure(self):
         for game_id in ("Game01", "Game02", "Game03"):
@@ -207,6 +208,156 @@ class NavigationTests(unittest.TestCase):
                 self.app.update()
                 self.assertEqual(self.app.current_scene_id, "Result")
                 self.assertEqual(self.app.game_cleared, state == "CLEAR")
+
+    def test_maze_scores_only_play_time_and_floors_bonus(self):
+        self.app.change_scene("Game01")
+        game = self.app.scene
+        with patch.object(pyxel, "btnp", return_value=False):
+            for _ in range(90):
+                self.app.update()
+        self.assertEqual(game.elapsed_frames, 0)
+        game.state = "SETUP"
+        x, y, _, _ = game.start_area
+        with patch.object(pyxel, "mouse_x", x + 1), \
+                patch.object(pyxel, "mouse_y", y + 1), \
+                patch.object(pyxel, "btnp", return_value=True), \
+                patch.object(pyxel, "pget", return_value=0):
+            self.app.update()
+            self.assertEqual(game.elapsed_frames, 0)
+            for _ in range(419):
+                self.app.update()
+        x, y, _, _ = game.goal_area
+        with patch.object(pyxel, "mouse_x", x + 1), \
+                patch.object(pyxel, "mouse_y", y + 1), \
+                patch.object(pyxel, "pget", return_value=0):
+            self.app.update()
+        self.assertEqual(game.elapsed_frames, 420)  # 7秒 → floor(3000 / 7) = 428
+        self.assertEqual(game.state, "CLEAR")
+        self.app.update()
+        self.assertEqual(list(self.app.score_hud.pending), [200, 428])
+        # 終了通知が繰り返されても基本点・ボーナスは一度だけ。
+        game.update()
+        self.assertEqual(list(self.app.score_hud.pending), [200, 428])
+
+    def test_maze_wall_collision_does_not_award_points(self):
+        self.app.change_scene("Game01")
+        game = self.app.scene
+        game.state = "PLAY"
+        with patch.object(pyxel, "pget", return_value=game.stage_color):
+            self.app.update()
+        self.assertEqual(game.state, "GAMEOVER")
+        self.app.update()
+        self.assertEqual(self.app.score_hud.value, 0)
+        self.assertFalse(self.app.score_hud.animating)
+
+    def test_counting_awards_200_only_for_correct_answer(self):
+        for answer in (0, 1):
+            self.app.change_scene("Game02")
+            game = self.app.scene
+            game.state = "RESULT"
+            game.current_house_pos = (220, -84)
+            game.answer_count = 0
+            game.user_answer = answer
+            game.time = 180
+            self.app.update()
+            expected = [200] if answer == 0 else []
+            self.assertEqual(list(self.app.score_hud.pending), expected)
+            game.update()
+            self.assertEqual(list(self.app.score_hud.pending), expected)
+
+    def test_shooter_counts_fired_and_hit_bullets_and_keeps_kill(self):
+        self.app.change_scene("Game03")
+        game = self.app.scene
+        game.state = "PLAY"
+        with patch.object(pyxel, "btn", return_value=True):
+            game._update_player()
+            game._update_player()  # クールダウン中は発射数を増やさない。
+            self.assertEqual(game.shots_fired, 1)
+            game.shoot_cooldown = 0
+            game._update_player()
+        self.assertEqual(game.shots_fired, 2)
+        game.boss.hp = 2
+        game.player_bullets[0].x = game.boss.center_x
+        game.player_bullets[0].y = game.boss.center_y
+        game.player_bullets[1].x = 0
+        game.enemy_bullets = [Bullet(game.player_x + 5, game.player_y + 4, 0, 0, 8)]
+        game._check_collisions()
+        self.assertEqual(game.state, "CLEAR")
+        self.assertEqual(game.shots_hit, 1)
+        self.app.update()
+        # 命中率50% → (50 / 10)^2 = 25
+        self.assertEqual(list(self.app.score_hud.pending), [200, 25])
+        game.update()
+        self.assertEqual(list(self.app.score_hud.pending), [200, 25])
+
+    def test_shooter_bonus_rounding_maximum_and_no_shots(self):
+        for fired, hit, expected in ((3, 2, [200, 44]), (5, 5, [200, 100]),
+                                     (0, 0, [200])):
+            with self.subTest(fired=fired, hit=hit):
+                self.app.change_scene("Game03")
+                game = self.app.scene
+                game.state = "CLEAR"
+                game.shots_fired, game.shots_hit = fired, hit
+                self.app.update()
+                self.assertEqual(list(self.app.score_hud.pending), expected)
+
+    def test_shooter_failure_awards_no_points_even_with_hits(self):
+        self.app.change_scene("Game03")
+        game = self.app.scene
+        game.state = "GAMEOVER"
+        game.shots_fired = game.shots_hit = 10
+        self.app.update()
+        self.assertEqual(self.app.score_hud.value, 0)
+        self.assertFalse(self.app.score_hud.animating)
+
+    def test_base_and_bonus_animate_separately_before_leaving_result(self):
+        self.app.change_scene("Game01")
+        game = self.app.scene
+        game.state = "CLEAR"
+        game.elapsed_frames = 420
+        self.app.update()
+        result = self.app.scene
+        self.assertFalse(result.buttons_enabled)
+        self.click(result.buttons[0][0])
+        self.assertEqual(self.app.current_scene_id, "Result")
+        hud = self.app.score_hud
+        while hud.value < 200:
+            self.app.update()
+        self.assertEqual(hud.value, 200)
+        self.assertEqual(list(hud.pending), [428])
+        self.assertFalse(result.buttons_enabled)
+        self.app.update()
+        self.assertEqual(hud.amount, 428)
+        self.assertEqual(hud.display_value, 200)
+        while hud.animating:
+            self.app.update()
+        self.assertEqual(hud.value, 628)
+        self.assertTrue(result.buttons_enabled)
+        self.click(result.buttons[0][0])
+        self.assertEqual(self.app.current_scene_id, "Title")
+
+    def test_attack_sums_actual_scores_from_all_games(self):
+        self.app.change_scene("Attack")
+        self.app.scene.state = "CLEAR"
+        self.app.scene.elapsed_frames = 600  # 10秒: 200 + 300
+        for game_id, expected in (("Game01", 500), ("Game02", 700), ("Game03", 944)):
+            self.assertEqual(self.app.current_scene_id, game_id)
+            game = self.app.scene
+            if game_id == "Game02":
+                game.state = "RESULT"
+                game.current_house_pos = (220, -84)
+                game.answer_count = game.user_answer = 0
+                game.time = 180
+            elif game_id == "Game03":
+                game.state = "CLEAR"
+                game.shots_hit, game.shots_fired = 2, 3
+            self.app.update()
+            while self.app.score_hud.animating:
+                self.app.update()
+            self.assertEqual(self.app.score_hud.value, expected)
+            self.click(self.app.next_button)
+        self.assertEqual(self.app.current_scene_id, "Result")
+        self.assertEqual(self.app.score_hud.value, 944)
 
     def test_game02_waits_for_answer_animation_including_zero(self):
         for correct in (False, True):
