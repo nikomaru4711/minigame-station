@@ -19,6 +19,13 @@ class ScoreScene(GameModule):
             self.tabs.append(Button(label, (x, 46, width, 28)))
             x += width + 4
         self.back = Button("タイトルに戻る", (120, 214, 200, 26))
+        self.refresh = Button("更新", (350, 214, 76, 26))
+        self.reload()
+
+    def reload(self):
+        self.app.ranking_service.retry_pending()
+        for category in self.CATEGORIES:
+            self.app.ranking_service.refresh(category)
 
     def update(self):
         for index, tab in enumerate(self.tabs):
@@ -27,6 +34,8 @@ class ScoreScene(GameModule):
                 return None
         if self.back.clicked():
             return "Title"
+        if self.refresh.clicked():
+            self.reload()
         return None
 
     def draw(self):
@@ -53,3 +62,7 @@ class ScoreScene(GameModule):
             pyxel.text(105, y, name, 7, self.font10)
             pyxel.text(310, y, score, 7, self.font10)
         self.back.draw(self.font10)
+        self.refresh.draw(self.font10)
+        status = self.app.ranking_service.status[self.CATEGORIES[self.category]]
+        if status:
+            pyxel.text(20, 200, status, 6, self.font10)

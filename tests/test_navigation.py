@@ -11,6 +11,8 @@ import pyxel
 from main import App
 from game03 import Bullet
 from setting import Settings
+from player import PlayerProfile
+from firestore_client import FirestoreClient
 
 
 class NavigationTests(unittest.TestCase):
@@ -24,7 +26,11 @@ class NavigationTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.settings = Settings(Path(self.temporary.name) / "settings.json")
+        self.player = PlayerProfile(Path(self.temporary.name) / "player.json")
+        self.player.set_name("テスト")
         with patch("main.Settings", return_value=self.settings), \
+                patch("main.PlayerProfile", return_value=self.player), \
+                patch("main.FirestoreClient", return_value=FirestoreClient(self.player, "", "")), \
                 patch.object(pyxel, "init"), patch.object(pyxel, "run"):
             self.app = App()
 
@@ -39,6 +45,92 @@ class NavigationTests(unittest.TestCase):
         target = self.app.finish_game(success)
         if target is not None:
             self.app.change_scene(target)
+
+    def test_title_rejects_empty_or_whitespace_names_and_blocks_direct_start(self):
+        self.player.name = ""
+        for name in ("", "   ", "　　"):
+            self.app.change_scene("Title")
+            self.app.scene.name_text = name
+            self.click(self.app.scene.buttons[0][0])
+            self.assertEqual(self.app.current_scene_id, "Title")
+            self.assertTrue(self.app.name_error)
+            self.click(self.app.scene.buttons[1][0])
+            self.assertEqual(self.app.current_scene_id, "Title")
+        self.app.change_scene("Game01")
+        self.assertEqual(self.app.current_scene_id, "Title")
+        self.click(self.app.scene.buttons[2][0])
+        self.assertEqual(self.app.current_scene_id, "Score")
+
+    def test_title_accepts_text_input_and_persists_trimmed_name(self):
+        self.player.name = ""
+        self.app.change_scene("Title")
+        with patch.object(pyxel, "input_text", "　プレイヤー "), \
+                patch.object(pyxel, "btnp", return_value=False):
+            self.app.update()
+        self.click(self.app.scene.buttons[0][0])
+        self.assertEqual(self.app.current_scene_id, "Game01")
+        self.assertEqual(self.player.name, "プレイヤー")
+        self.assertEqual(PlayerProfile(self.player.path).name, "プレイヤー")
+
+    def test_title_accepts_fullwidth_then_halfwidth_without_losing_focus(self):
+        self.player.name = ""
+        self.app.change_scene("Title")
+        for committed in ("abc", "", "１２", "名前", "def"):
+            with patch.object(pyxel, "input_text", committed), \
+                    patch.object(pyxel, "btnp", return_value=False):
+                self.app.update()
+        self.assertEqual(self.app.scene.name_text, "abc１２名前def")
+        self.assertTrue(self.app.scene.focused)
+        with patch.object(pyxel, "input_text", ""), \
+                patch.object(pyxel, "btnp", side_effect=lambda key, **kw: key == pyxel.KEY_BACKSPACE), \
+                patch("title.ime_composing", return_value=True):
+            self.app.update()
+        self.assertEqual(self.app.scene.name_text, "abc１２名前def")
+
+    def test_counting_committed_digits_do_not_duplicate_raw_key_events(self):
+        self.app.change_scene("Game02")
+        game = self.app.scene
+        game.state = "ANSWER"
+        for committed in ("１", "2", "３"):
+            with patch.object(pyxel, "input_text", committed), \
+                    patch.object(pyxel, "btnp", side_effect=lambda key, **kw: key == pyxel.KEY_2):
+                self.app.update()
+        self.assertEqual(game.input_text, "123")
+        with patch.object(pyxel, "input_text", ""), \
+                patch.object(pyxel, "btnp", side_effect=lambda key, **kw: key == pyxel.KEY_BACKSPACE), \
+                patch("game02.ime_composing", return_value=True):
+            self.app.update()
+        self.assertEqual(game.input_text, "123")
+        with patch.object(pyxel, "input_text", ""), \
+                patch.object(pyxel, "btnp", side_effect=lambda key, **kw: key == pyxel.KEY_BACKSPACE), \
+                patch("game02.ime_composing", return_value=False):
+            self.app.update()
+        self.assertEqual(game.input_text, "12")
+        x, y, _, _ = game.confirm_ans_button_area
+        with patch.object(pyxel, "input_text", ""), \
+                patch.object(pyxel, "mouse_x", x + 1), patch.object(pyxel, "mouse_y", y + 1), \
+                patch.object(pyxel, "btnp", side_effect=lambda key, **kw: key == pyxel.MOUSE_BUTTON_LEFT):
+            self.app.update()
+        self.assertEqual(game.user_answer, 12)
+        self.assertEqual(game.state, "RESULT")
+
+    def test_finished_games_submit_individual_scores_and_attack_total_once(self):
+        self.app.change_scene("Attack")
+        player_name = self.app.run_player_name
+        self.player.set_name("新しい名前")
+        with patch.object(self.app.ranking_service, "submit") as submit:
+            for game_id, score in (("Game01", 500), ("Game02", 150), ("Game03", 225)):
+                self.assertEqual(self.app.current_scene_id, game_id)
+                self.app.add_score(score)
+                self.finish(False)
+                self.finish(False)
+                self.click(self.app.next_button)
+        self.assertEqual([call.args for call in submit.call_args_list], [
+            ("Game01", self.player.player_id, player_name, 500),
+            ("Game02", self.player.player_id, player_name, 150),
+            ("Game03", self.player.player_id, player_name, 225),
+            ("Attack", self.player.player_id, player_name, 875),
+        ])
 
     def test_title_buttons_and_individual_game(self):
         self.assertEqual(len(self.app.scene.buttons), 4)

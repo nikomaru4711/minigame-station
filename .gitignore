@@ -1,3 +1,5 @@
 __pycache__/
 data/settings.json
 data/settings.tmp
+data/player.json
+data/player.tmp

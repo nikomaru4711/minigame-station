@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{collection}/{userId} {
+      function rankingCollection() {
+        return collection in ['rankings_attack', 'rankings_game01',
+                              'rankings_game02', 'rankings_game03'];
+      }
+      function validEntry() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['player_id', 'player_name', 'score'])
+          && data.keys().hasOnly(['player_id', 'player_name', 'score'])
+          && data.player_id is string
+          && data.player_id.matches('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+          && data.player_name is string
+          && data.player_name.size() > 0 && data.player_name.size() <= 16
+          && data.player_name.matches('.*[^ \\t\\r\\n　].*')
+          && data.score is int && data.score >= 0;
+      }
+      allow get: if rankingCollection() && request.auth != null;
+      allow list: if rankingCollection() && request.auth != null
+        && request.query.limit != null && request.query.limit <= 5;
+      allow create: if rankingCollection() && request.auth != null
+        && request.auth.uid == userId && validEntry();
+      allow update: if rankingCollection() && request.auth != null
+        && request.auth.uid == userId && validEntry()
+        && request.resource.data.player_id == resource.data.player_id
+        && request.resource.data.score >= resource.data.score;
+      allow delete: if false;
+    }
+  }
+}

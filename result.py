@@ -28,6 +28,10 @@ class ResultScene(MenuScene):
 
     def draw(self):
         super().draw()
+        category = "Attack" if self.app.play_mode == "attack" else self.app.active_game_id
+        status = self.app.ranking_service.status.get(category, "")
+        if status:
+            pyxel.text(30, 151, status, 6, self.font10)
         if self.app.play_mode == "attack":
             index = GAME_IDS.index(self.app.active_game_id) + 1
             pyxel.text(170, 85, f"ミニゲーム {index} / 3", 7, self.font10)

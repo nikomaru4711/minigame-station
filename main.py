@@ -11,16 +11,26 @@ from setting import Settings
 from settings_scene import SettingsScene
 from title import TitleScene
 from ui import Button
+from player import PlayerProfile, valid_name
+from firestore_client import FirestoreClient
+from ranking_service import RankingService
+from text_input import configure_ime
 
 
 class App:
     def __init__(self):
         self.fps = 60
+        configure_ime()
         pyxel.init(440, 250, title="Minigame Station", fps=self.fps)
         self.settings = Settings()
         self.audio = Audio(self.settings)
-        # ランキングへのユーザー名付き記録登録は未実装。
-        self.rankings = {key: [] for key in ("Attack", *GAME_IDS)}
+        self.player = PlayerProfile()
+        self.ranking_service = RankingService(FirestoreClient(self.player))
+        self.rankings = self.ranking_service.rankings
+        self.name_error = ""
+        self.run_player_name = self.player.name
+        self.game_score = 0
+        self._game_submitted = False
         self.play_mode = "single"
         self.active_game_id = None
         self.game_cleared = False
@@ -31,8 +41,13 @@ class App:
         pyxel.run(self.update, self.draw)
 
     def change_scene(self, next_scene_id):
+        if next_scene_id in ("Attack", "GameSelect", "Retry", "NextGame", *GAME_IDS):
+            if not valid_name(self.player.name):
+                self.name_error = "名前を入力してからプレイしてください"
+                return
         if next_scene_id == "Attack":
             self.play_mode = "attack"
+            self.run_player_name = self.player.name
             self.score_hud.reset()
             next_scene_id = GAME_IDS[0]
         elif next_scene_id == "Retry":
@@ -51,6 +66,9 @@ class App:
         if next_scene_id in GAME_IDS:
             if self.play_mode == "single":
                 self.score_hud.reset()
+                self.run_player_name = self.player.name
+            self.game_score = 0
+            self._game_submitted = False
             self.active_game_id = next_scene_id
             self.game_cleared = False
         self.attack_finished = False
@@ -60,6 +78,13 @@ class App:
 
     def finish_game(self, cleared):
         self.game_cleared = cleared
+        if not self._game_submitted:
+            self._game_submitted = True
+            self.ranking_service.submit(self.active_game_id, self.player.player_id,
+                                        self.run_player_name, self.game_score)
+            if self.play_mode == "attack" and self.active_game_id == GAME_IDS[-1]:
+                self.ranking_service.submit("Attack", self.player.player_id,
+                                            self.run_player_name, self.score_hud.value)
         if self.play_mode == "attack":
             # シーンもゲームのオブジェクトも維持し、更新だけを停止する。
             self.attack_finished = True
@@ -73,8 +98,22 @@ class App:
     def add_score(self, amount):
         """点数は即時に確定し、表示の加算演出を順番に予約する。"""
         self.score_hud.add(amount)
+        self.game_score += amount
+
+    def set_player_name(self, name):
+        try:
+            self.player.set_name(name)
+        except ValueError:
+            self.name_error = "名前を１〜16文字で入力してください"
+            return False
+        except OSError:
+            self.name_error = "名前を保存できませんでした"
+            return False
+        self.name_error = ""
+        return True
 
     def update(self):
+        self.ranking_service.poll()
         self.score_hud.update()
         if self.attack_finished:
             if self.next_button.clicked():

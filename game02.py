@@ -4,6 +4,7 @@ import math
 from module import GameModule
 import random as rand
 from pathlib import Path
+from text_input import append_digits, ime_composing
 # 家の座標元データ ########################################################
 # self.house_area = [(80, 20), (105, 45), (105, 80), (55, 80), (55, 45)]
 # self.house_window_area1 = [(86, 50), (92, 50), (92, 56), (86, 56)]
@@ -236,19 +237,13 @@ class Game02(GameModule):
                 self.phase = 1
         
         elif self.state == "ANSWER":
-            # 数字キーの入力受付 ########################################################
-            if len(self.input_text) < self.max_digits:
-                for num in range(10):
-                    if pyxel.btnp(getattr(pyxel, f"KEY_{num}")) or pyxel.btnp(
-                        getattr(pyxel, f"KEY_KP_{num}")
-                    ):
-                        if self.input_text == "0":
-                            self.input_text = str(num)  # "05" のように先頭に0が残るのを防ぐ
-                        else:
-                            self.input_text += str(num)
+            # IME確定文字を使い、全角数字も半角に揃える。
+            # KEY_0等を同時に読むと１回の入力が二重に加算されるため使わない。
+            committed = pyxel.input_text
+            self.input_text = append_digits(self.input_text, committed, self.max_digits)
 
             # Backspace で1文字削除
-            if pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4):
+            if not committed and pyxel.btnp(pyxel.KEY_BACKSPACE, hold=15, repeat=4) and not ime_composing():
                 self.input_text = self.input_text[:-1]
 
             # 確定ボタンの処理 ########################################################
