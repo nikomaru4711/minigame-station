@@ -3,6 +3,7 @@ import pyxel
 import math
 from module import GameModule
 import random as rand
+from pathlib import Path
 # 家の座標元データ ########################################################
 # self.house_area = [(80, 20), (105, 45), (105, 80), (55, 80), (55, 45)]
 # self.house_window_area1 = [(86, 50), (92, 50), (92, 56), (86, 56)]
@@ -18,8 +19,9 @@ class Game02(GameModule):
         super().__init__()
         self.app = app
         pyxel.mouse(True)
-        pyxel.images[0].load(0, 0, "assets/images/wotu_icon_40px.png")
-        pyxel.images[0].load(40, 0, "assets/images/wotu_icon_rotate_40px.png")
+        image_dir = Path(__file__).resolve().parent / "assets/images"
+        pyxel.images[0].load(0, 0, str(image_dir / "wotu_icon_40px.png"))
+        pyxel.images[0].load(40, 0, str(image_dir / "wotu_icon_rotate_40px.png"))
         # ユーザー設定 #####
         self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
         self.confirm_ans_button_area = (300, 100, 100, 100) 
@@ -287,6 +289,10 @@ class Game02(GameModule):
                         w["x"] = w["sx"] + (w["tx"] - w["sx"]) * ease_t
                         w["y"] = w["sy"] + (w["ty"] - w["sy"]) * ease_t  
                 self.dealt_count = count
+                if self.dealt_count == self.answer_count:
+                    self.time += 1
+                    if self.time > 180:
+                        return self.app.finish_game(self.answer_count == self.user_answer)
             else:
                 self.current_house_pos = (housex, housey-4)
 
@@ -351,7 +357,7 @@ class Game02(GameModule):
             pyxel.text(216, 20, str(int(self.time_limit / 60)), 7, self.font10)  
         elif self.state == "ANSWER":
             housex, housey = self.current_house_pos
-            pyxel.text(200, 20, "家の中にいるヲツは何人？(数字を入力)", 7, self.font10)
+            pyxel.text(10, 50, "家の中にいるヲツは何人？(数字を入力)", 7, self.font10)
             self.draw_house(self.current_house_pos)
             button_bg_color = 6 if self.is_hover_confirm_answer else 12
             button_text_color = 13 if self.is_hover_confirm_answer else 7
@@ -373,8 +379,7 @@ class Game02(GameModule):
             self.draw_house(self.current_house_pos)
 
             if self.dealt_count == self.answer_count:
-                self.time += 1
-                if self.time > 90: # タイマを初期化するとtextが点滅してしまうので、初期化していない
+                if self.time > 90:
                     if self.answer_count == self.user_answer:
                         pyxel.text(220,60,"○", 12, self.font20)
                 

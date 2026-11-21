@@ -157,14 +157,12 @@ class Game03(GameModule):
 
             if is_clicked or is_key_start:
                 self.state = "PLAY"
-                pyxel.play(0, 0)
+                self.app.audio.play_se(0, 0)
             return None
 
         # 2. ゲームオーバー / クリア画面
         if self.state != "PLAY":
-            if pyxel.btnp(pyxel.KEY_R):
-                self.reset_game()
-            return None
+            return self.app.finish_game(self.state == "CLEAR")
 
         # 3. プレイ中の更新処理
         self._update_player()
@@ -190,7 +188,7 @@ class Game03(GameModule):
             by = self.player_y - 7
             self.player_bullets.append(Bullet(bx, by, 0.0, -5.5, 7))
             self.shoot_cooldown = 10
-            pyxel.play(0, 0)
+            self.app.audio.play_se(0, 0)
 
     def _update_boss(self):
         self.boss.update()
@@ -259,11 +257,11 @@ class Game03(GameModule):
                 b.is_alive = False
                 self.boss.hp = max(0, self.boss.hp - 2)
                 self.boss.hit_flash_timer = 3
-                pyxel.play(1, 1)
+                self.app.audio.play_se(1, 1)
 
                 if self.boss.hp == 0:
                     self.state = "CLEAR"
-                    pyxel.play(0, 2)
+                    self.app.audio.play_se(0, 2)
                     break
 
         # ボスの弾 vs 自機（中心寄りの小さめ判定）
@@ -279,7 +277,7 @@ class Game03(GameModule):
                 self.player_h - 4,
             ):
                 self.state = "GAMEOVER"
-                pyxel.play(0, 2)
+                self.app.audio.play_se(0, 2)
                 break
 
     def draw(self):
@@ -307,7 +305,7 @@ class Game03(GameModule):
             b.draw()
 
         # ゲームオーバー / クリア時のオーバーレイ
-        if self.state in ("GAMEOVER", "CLEAR"):
+        if self.state in ("GAMEOVER", "CLEAR") and self.app.play_mode != "attack":
             pyxel.dither(0.5)
             pyxel.rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0)
             pyxel.dither(1.0)
@@ -317,7 +315,6 @@ class Game03(GameModule):
             else:
                 pyxel.text(180, 95, "CLEAR!", 10, self.font20)
 
-            pyxel.text(165, 130, "[R] イントロへ戻る", 7, self.font10)
 
     def _draw_boss_hp_bar(self):
         pyxel.text(14, 8, "ヲツ", 8 if self.boss.is_enraged else 7, self.font10)

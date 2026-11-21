@@ -1,9 +1,11 @@
 import pyxel
+from pathlib import Path
 
 class GameModule:
     def __init__(self):
-      self.font10 = pyxel.Font("assets/fonts/PixelMplus10-Regular.ttf", 10)
-      self.font20 = pyxel.Font("assets/fonts/PixelMplus10-Regular.ttf", 20)
+      font_path = str(Path(__file__).resolve().parent / "assets/fonts/PixelMplus10-Regular.ttf")
+      self.font10 = pyxel.Font(font_path, 10)
+      self.font20 = pyxel.Font(font_path, 20)
     
     def fill_polygon(self, pts, col):
         # 凸多角形を三角形に分割して塗りつぶして描画する

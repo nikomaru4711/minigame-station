@@ -141,14 +141,9 @@ class Game01(GameModule):
             if gx <= mx <= gx + gw and gy <= my <= gy + gh:
                 self.state = "CLEAR"
 
-            elif self.state in ("GAMEOVER", "CLEAR"):
-                if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-                    # コースの再生成
-                    self.maze = generateMaze.generate_maze(
-                        self.grid_width, self.grid_height
-                    )
-                    self.state = "START"
-            return None
+        elif self.state in ("GAMEOVER", "CLEAR"):
+            return self.app.finish_game(self.state == "CLEAR")
+        return None
 
     def draw(self):
         pyxel.cls(0)
@@ -171,8 +166,10 @@ class Game01(GameModule):
             self.draw_maze()
 
         elif self.state == "GAMEOVER":
-            pyxel.text(50, 30, "GAME OVER", 8, self.font10)
+            if self.app.play_mode != "attack":
+                pyxel.text(50, 30, "GAME OVER", 8, self.font10)
             self.draw_maze()
         elif self.state == "CLEAR":
-            pyxel.text(50, 30, "CLEAR!", 10, self.font10)
+            if self.app.play_mode != "attack":
+                pyxel.text(50, 30, "CLEAR!", 10, self.font10)
             self.draw_maze()
