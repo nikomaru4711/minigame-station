@@ -13,24 +13,34 @@ class ScoreScene(GameModule):
         self.app = app
         self.category = 0
         pyxel.mouse(True)
-        self.previous = Button("前へ", (20, 48, 60, 24))
-        self.next = Button("次へ", (360, 48, 60, 24))
+        self.tabs = []
+        x = 14
+        for label, width in zip(self.NAMES, (130, 90, 90, 90)):
+            self.tabs.append(Button(label, (x, 46, width, 28)))
+            x += width + 4
         self.back = Button("タイトルに戻る", (120, 214, 200, 26))
 
     def update(self):
-        if self.previous.clicked():
-            self.category = (self.category - 1) % len(self.CATEGORIES)
-        elif self.next.clicked():
-            self.category = (self.category + 1) % len(self.CATEGORIES)
-        elif self.back.clicked():
+        for index, tab in enumerate(self.tabs):
+            if tab.clicked():
+                self.category = index
+                return None
+        if self.back.clicked():
             return "Title"
         return None
 
     def draw(self):
         pyxel.cls(0)
         pyxel.text(150, 12, "スコアランキング", 10, self.font20)
-        label = self.NAMES[self.category]
-        pyxel.text((440 - self.font10.text_width(label)) // 2, 55, label, 7, self.font10)
+        for index, tab in enumerate(self.tabs):
+            x, y, width, height = tab.area
+            selected = index == self.category
+            pyxel.rect(x, y, width, height, 1 if selected else 6 if tab.hovered() else 0)
+            pyxel.rectb(x, y, width, height, 12 if selected else 5)
+            pyxel.text(x + (width - self.font10.text_width(tab.label)) // 2,
+                       y + 9, tab.label, 10 if selected else 7, self.font10)
+            if selected:
+                pyxel.rect(x, y + height - 3, width, 3, 10)
         entries = sorted(self.app.rankings[self.CATEGORIES[self.category]],
                          key=lambda entry: entry["score"], reverse=True)[:5]
         for i in range(5):
@@ -42,5 +52,4 @@ class ScoreScene(GameModule):
                 name = name[:-1]
             pyxel.text(105, y, name, 7, self.font10)
             pyxel.text(310, y, score, 7, self.font10)
-        for button in (self.previous, self.next, self.back):
-            button.draw(self.font10)
+        self.back.draw(self.font10)

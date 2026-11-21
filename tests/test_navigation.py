@@ -501,9 +501,14 @@ class NavigationTests(unittest.TestCase):
         with patch.object(pyxel, "text") as text:
             self.app.draw()
         self.assertEqual(sum(call.args[2] == "---" for call in text.call_args_list), 6)
-        for expected in (1, 2, 3, 0):
-            self.click(self.app.scene.next)
+        for expected in (3, 1, 0, 2, 2, 0):
+            self.click(self.app.scene.tabs[expected])
             self.assertEqual(self.app.scene.category, expected)
+            with patch.object(pyxel, "text") as text:
+                self.app.draw()
+            names = [call.args[2] for call in text.call_args_list if call.args[0] == 105]
+            self.assertEqual(names, ["User1", "User0", "---", "---", "---"]
+                             if expected == 0 else ["---"] * 5)
 
     def test_settings_save_reload_and_independent_channel_gains(self):
         self.app.change_scene("Settings")
