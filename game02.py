@@ -23,7 +23,7 @@ class Game02(GameModule):
         pyxel.images[0].load(0, 0, str(image_dir / "wotu_icon_40px.png"))
         pyxel.images[0].load(40, 0, str(image_dir / "wotu_icon_rotate_40px.png"))
         # ユーザー設定 #####
-        self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
+        self.s_button_area = (165, 182, 110, 28) #(x,y,w,h)
         self.confirm_ans_button_area = (300, 100, 100, 100) 
         self.entry_rate = [0.01, 0.02, 0.035]
         self.exit_rate = [0.015, 0.02, 0.04]
@@ -305,23 +305,25 @@ class Game02(GameModule):
     def draw(self):
         pyxel.cls(0)
         if self.state == "INTRODUCTION":
-            # 半透明な図形を描画 ########################
-            # pyxel.dither(0.5)
-            # pyxel.rect(0, 0, pyxel.width, pyxel.height, 1)
-            # pyxel.dither(1.0)
-            ############################################
-            button_bg_color = 6 if self.is_hover_start else 12
-            button_text_color = 13 if self.is_hover_start else 7
-            pyxel.text(2, 2, "ヲツかぞえ", 7, self.font10)
-            pyxel.text(5, 17, "家の中にいるヲツの数を計算して、\n最後に答えよう", 7, self.font10)
+            title = "ヲツかぞえ"
+            pyxel.text((440 - self.font20.text_width(title)) // 2, 30, title, 10, self.font20)
+            pyxel.line(90, 56, 350, 56, 5)
 
-            pyxel.text(85, 50, "←ヲツ", 7, self.font10)            
-            pyxel.blt(40, 45, 0, 0, 0, 40, 40, 0)
-            
-            sx, sy, sw, sh = self.s_button_area
-            pyxel.rect(sx, sy, sw, sh, button_bg_color)
-            pyxel.rectb(sx, sy, sw, sh, 5)
-            pyxel.text(sx+2, sy, "START", button_text_color, self.font10)
+            pyxel.rect(95, 70, 250, 96, 1)
+            pyxel.rectb(95, 70, 250, 96, 6)
+            heading = "【 操作説明 】"
+            pyxel.text((440 - self.font10.text_width(heading)) // 2, 80, heading, 11, self.font10)
+            pyxel.blt(110, 101, 0, 0, 0, 40, 40, 0)
+            pyxel.text(158, 103, "出入りするヲツを数えよう", 7, self.font10)
+            pyxel.text(158, 121, "数字を入力し、確定をクリック", 7, self.font10)
+            goal = "最後に家の中の人数を答えよう！"
+            pyxel.text((440 - self.font10.text_width(goal)) // 2, 146, goal, 10, self.font10)
+
+            bx, by, bw, bh = self.s_button_area
+            is_hover = self.is_mouse_over_area(self.s_button_area)
+            pyxel.rect(bx, by, bw, bh, 10 if is_hover else 3)
+            pyxel.rectb(bx, by, bw, bh, 7)
+            pyxel.text(bx + 27, by + 4, "START", 0 if is_hover else 7, self.font20)
         elif self.state == "SETUP":
             # summary:家の中にいるヲツの表示と家の配置
             housex, housey = self.current_house_pos

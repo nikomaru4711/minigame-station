@@ -64,7 +64,7 @@ class Game01(GameModule):
         sx, sy = 50, 50
         self.grid_width = 37
         self.grid_height = 19
-        self.s_button_area = (70, 100, 30, 11) #(x,y,w,h)
+        self.s_button_area = (165, 182, 110, 28) #(x,y,w,h)
         ###################
         self.is_hover_start = False
         self.s_button_area
@@ -158,15 +158,25 @@ class Game01(GameModule):
         (sx, sy), _ = self.maze_area
 
         if self.state == "INTRODUCTION":
-            button_bg_color = 6 if self.is_hover_start else 12
-            button_text_color = 13 if self.is_hover_start else 7
-            pyxel.text(2, 2, "イライラ棒", 7, self.font10)
-            pyxel.text(5, 17, "壁に当たらずにゴールまでマウスを動かそう！", 7, self.font10)
-            
-            sx, sy, sw, sh = self.s_button_area
-            pyxel.rect(sx, sy, sw, sh, button_bg_color)
-            pyxel.rectb(sx, sy, sw, sh, 5)
-            pyxel.text(sx+2, sy, "START", button_text_color, self.font10)
+            title = "イライラ棒"
+            pyxel.text((440 - self.font20.text_width(title)) // 2, 30, title, 10, self.font20)
+            pyxel.line(90, 56, 350, 56, 5)
+
+            pyxel.rect(95, 70, 250, 96, 1)
+            pyxel.rectb(95, 70, 250, 96, 6)
+            for text, y, color in (
+                ("【 操作説明 】", 80, 11),
+                ("緑のSTARTをクリックして開始", 100, 7),
+                ("マウスを動かして進もう", 116, 7),
+                ("壁に当たらずゴールを目指そう！", 140, 10),
+            ):
+                pyxel.text((440 - self.font10.text_width(text)) // 2, y, text, color, self.font10)
+
+            bx, by, bw, bh = self.s_button_area
+            is_hover = self.is_mouse_over_area(self.s_button_area)
+            pyxel.rect(bx, by, bw, bh, 10 if is_hover else 3)
+            pyxel.rectb(bx, by, bw, bh, 7)
+            pyxel.text(bx + 27, by + 4, "START", 0 if is_hover else 7, self.font20)
         elif self.state == "SETUP":
             self.draw_maze()
             pyxel.text(50, 30, "STARTをクリックして開始", 7, self.font10)
