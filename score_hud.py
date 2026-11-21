@@ -18,6 +18,7 @@ class ScoreHUD(GameModule):
     def reset(self):
         self.value = 0
         self.display_value = 0
+        self.count_from = 0
         self.pending = deque()
         self.amount = None
         self.frame = 0
@@ -30,6 +31,8 @@ class ScoreHUD(GameModule):
         if type(amount) is not int or amount < 0:
             raise ValueError("Score addition must be a non-negative integer")
         if amount:
+            # 確定スコアは即時反映し、表示の進行とは独立させる。
+            self.value += amount
             self.pending.append(amount)
 
     def update(self):
@@ -37,16 +40,16 @@ class ScoreHUD(GameModule):
             if not self.pending:
                 return
             self.amount = self.pending.popleft()
+            self.count_from = self.display_value
             self.frame = 0
         self.frame += 1
         count_start = self.ENTER_FRAMES + self.MERGE_FRAMES
         if self.frame > count_start:
             t = min((self.frame - count_start) / self.COUNT_FRAMES, 1)
             # 合流後だけ本体の数値をカウントアップする。
-            self.display_value = self.value + round(self.amount * (1 - (1 - t) ** 3))
+            self.display_value = self.count_from + round(self.amount * (1 - (1 - t) ** 3))
             if t == 1:
-                self.value += self.amount
-                self.display_value = self.value
+                self.display_value = self.count_from + self.amount
                 self.amount = None
 
     def bonus_pose(self):

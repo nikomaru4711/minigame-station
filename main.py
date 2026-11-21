@@ -71,14 +71,13 @@ class App:
         return "Result"
 
     def add_score(self, amount):
-        """各ゲームから加点を受け取り、順番に演出する。"""
+        """点数は即時に確定し、表示の加算演出を順番に予約する。"""
         self.score_hud.add(amount)
 
     def update(self):
-        if self.current_scene_id in GAME_IDS or self.current_scene_id == "Result":
-            self.score_hud.update()
+        self.score_hud.update()
         if self.attack_finished:
-            if not self.score_hud.animating and self.next_button.clicked():
+            if self.next_button.clicked():
                 target = "Result" if self.active_game_id == GAME_IDS[-1] else "NextGame"
                 self.change_scene(target)
             return
@@ -92,7 +91,7 @@ class App:
             # ヲツベーダーでは画面上部のボスHPバーより下に置く。
             y = 24 if self.current_scene_id == "Game03" else 4
             self.score_hud.draw(y)
-        if self.attack_finished and not self.score_hud.animating:
+        if self.attack_finished:
             self.next_button.draw(self.scene.font10)
 
 

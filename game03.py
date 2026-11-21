@@ -169,6 +169,10 @@ class Game03(GameModule):
                 # 命中率は0〜100%。(命中率 / 10)^2 を端数切り捨てで計算。
                 bonus = 100 * self.shots_hit ** 2 // self.shots_fired ** 2 if self.shots_fired else 0
                 self.award_clear_score(bonus)
+            elif self.state == "GAMEOVER":
+                # 敗北時は与えたダメージ割合に応じた基本点のみ。端数切り捨て。
+                base = 200 * (self.boss.max_hp - self.boss.hp) // self.boss.max_hp
+                self.award_score(base)
             return self.app.finish_game(self.state == "CLEAR")
 
         # 3. プレイ中の更新処理

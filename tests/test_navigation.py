@@ -118,35 +118,46 @@ class NavigationTests(unittest.TestCase):
         self.click(self.app.next_button)
         self.assertEqual(self.app.current_scene_id, "Game03")
 
-    def test_attack_waits_for_score_animation_and_carries_total(self):
+    def test_attack_can_advance_and_keep_playing_during_score_animation(self):
         self.app.change_scene("Attack")
         self.app.add_score(120)
         self.finish(False)
         self.click(self.app.next_button)
-        self.assertEqual(self.app.current_scene_id, "Game01")
-        while self.app.score_hud.animating:
-            self.app.update()
-        self.assertEqual(self.app.score_hud.value, 120)
-        self.click(self.app.next_button)
         self.assertEqual(self.app.current_scene_id, "Game02")
+        self.assertTrue(self.app.score_hud.animating)
         self.assertEqual(self.app.score_hud.value, 120)
+        game = self.app.scene
+        game.state = "PLAY"
+        game.max_events = 0
+        time_left = game.time_limit
+        animation_frame = self.app.score_hud.frame
+        for _ in range(5):
+            self.app.update()
+        self.assertEqual(game.time_limit, time_left - 5)
+        self.assertEqual(self.app.score_hud.frame, animation_frame + 5)
         self.finish(True)
         self.click(self.app.next_button)
         self.assertEqual(self.app.current_scene_id, "Game03")
         self.finish(False)
         self.click(self.app.next_button)
         self.assertEqual(self.app.current_scene_id, "Result")
+        self.assertTrue(self.app.score_hud.animating)
         self.assertEqual(self.app.score_hud.value, 120)
         self.assertFalse(self.app.attack_finished)
         self.click(self.app.scene.buttons[0][0])
+        self.assertEqual(self.app.current_scene_id, "Title")
+        self.assertEqual(self.app.score_hud.value, 120)
         self.app.change_scene("Attack")
         self.assertEqual(self.app.score_hud.value, 0)
+        self.assertEqual(self.app.score_hud.display_value, 0)
+        self.assertFalse(self.app.score_hud.animating)
 
     def test_score_fades_in_then_merges_then_counts_up_in_order(self):
         hud = self.app.score_hud
         self.assertEqual(hud.display_value, 0)
         self.app.add_score(100)
         self.app.add_score(25)
+        self.assertEqual(hud.value, 125)
         self.assertEqual(hud.display_value, 0)
         for _ in range(hud.ENTER_FRAMES // 2):
             hud.update()
@@ -250,17 +261,25 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(self.app.score_hud.value, 0)
         self.assertFalse(self.app.score_hud.animating)
 
-    def test_counting_awards_200_only_for_correct_answer(self):
-        for answer in (0, 1):
+    def test_counting_awards_partial_credit_in_both_directions(self):
+        for error in range(-4, 5):
             self.app.change_scene("Game02")
             game = self.app.scene
             game.state = "RESULT"
             game.current_house_pos = (220, -84)
-            game.answer_count = 0
-            game.user_answer = answer
+            game.answer_count = 5
+            game.user_answer = 5 + error
+            game.wotu_list = [
+                {"timer": 20, "delay": 0, "duration": 20,
+                 "sx": 200, "sy": 120, "tx": 40, "ty": 140,
+                 "x": 40, "y": 140} for _ in range(5)
+            ]
             game.time = 180
             self.app.update()
-            expected = [200] if answer == 0 else []
+            base = {0: 200, 1: 150, 2: 100, 3: 100}.get(abs(error), 0)
+            expected = [base] if base else []
+            self.assertEqual(self.app.score_hud.value, base)
+            self.assertEqual(self.app.game_cleared, error == 0)
             self.assertEqual(list(self.app.score_hud.pending), expected)
             game.update()
             self.assertEqual(list(self.app.score_hud.pending), expected)
@@ -301,31 +320,65 @@ class NavigationTests(unittest.TestCase):
                 self.app.update()
                 self.assertEqual(list(self.app.score_hud.pending), expected)
 
-    def test_shooter_failure_awards_no_points_even_with_hits(self):
-        self.app.change_scene("Game03")
+    def test_shooter_failure_awards_damage_points_without_accuracy_bonus(self):
+        for maximum, remaining, expected in ((100, 100, 0), (100, 75, 50),
+                                               (100, 50, 100), (100, 1, 198),
+                                               (300, 199, 67)):
+            with self.subTest(maximum=maximum, remaining=remaining):
+                self.app.change_scene("Game03")
+                game = self.app.scene
+                game.state = "GAMEOVER"
+                game.boss.max_hp, game.boss.hp = maximum, remaining
+                # 命中率100%でも敗北時には命中率ボーナスを付けない。
+                game.shots_fired = game.shots_hit = 10
+                self.app.update()
+                self.assertEqual(self.app.score_hud.value, expected)
+                self.assertFalse(self.app.game_cleared)
+                queue = [expected] if expected else []
+                self.assertEqual(list(self.app.score_hud.pending), queue)
+                game.update()
+                self.assertEqual(self.app.score_hud.value, expected)
+                self.assertEqual(list(self.app.score_hud.pending), queue)
+
+    def test_attack_carries_partial_credit_to_final_result(self):
+        self.app.change_scene("Attack")
+        self.app.scene.state = "GAMEOVER"
+        self.app.update()
+        self.click(self.app.next_button)
+        game = self.app.scene
+        game.state = "RESULT"
+        game.current_house_pos = (220, -84)
+        game.answer_count, game.user_answer = 0, 1
+        game.time = 180
+        self.app.update()
+        self.assertEqual(self.app.score_hud.value, 150)
+        self.click(self.app.next_button)
         game = self.app.scene
         game.state = "GAMEOVER"
-        game.shots_fired = game.shots_hit = 10
+        game.boss.hp = 50
         self.app.update()
-        self.assertEqual(self.app.score_hud.value, 0)
-        self.assertFalse(self.app.score_hud.animating)
+        self.assertEqual(self.app.score_hud.value, 250)
+        self.click(self.app.next_button)
+        self.assertEqual(self.app.current_scene_id, "Result")
+        self.assertEqual(self.app.score_hud.value, 250)
 
-    def test_base_and_bonus_animate_separately_before_leaving_result(self):
+    def test_base_and_bonus_animate_separately_with_total_already_committed(self):
         self.app.change_scene("Game01")
         game = self.app.scene
         game.state = "CLEAR"
         game.elapsed_frames = 420
         self.app.update()
         result = self.app.scene
-        self.assertFalse(result.buttons_enabled)
-        self.click(result.buttons[0][0])
-        self.assertEqual(self.app.current_scene_id, "Result")
+        self.assertTrue(result.buttons_enabled)
         hud = self.app.score_hud
-        while hud.value < 200:
+        self.assertEqual(hud.value, 628)
+        self.assertEqual(hud.display_value, 0)
+        for _ in range(hud.ENTER_FRAMES + hud.MERGE_FRAMES + hud.COUNT_FRAMES):
             self.app.update()
-        self.assertEqual(hud.value, 200)
+        self.assertEqual(hud.value, 628)
+        self.assertEqual(hud.display_value, 200)
         self.assertEqual(list(hud.pending), [428])
-        self.assertFalse(result.buttons_enabled)
+        self.assertTrue(result.buttons_enabled)
         self.app.update()
         self.assertEqual(hud.amount, 428)
         self.assertEqual(hud.display_value, 200)
@@ -335,6 +388,41 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(result.buttons_enabled)
         self.click(result.buttons[0][0])
         self.assertEqual(self.app.current_scene_id, "Title")
+
+    def test_single_game_can_leave_result_during_animation_without_losing_total(self):
+        self.app.change_scene("Game01")
+        self.app.scene.state = "CLEAR"
+        self.app.scene.elapsed_frames = 420
+        self.app.update()
+        hud = self.app.score_hud
+        self.assertTrue(hud.animating)
+        self.assertEqual(hud.value, 628)
+        self.click(self.app.scene.buttons[0][0])
+        self.assertEqual(self.app.current_scene_id, "Title")
+        self.assertEqual(hud.value, 628)
+        while hud.animating:
+            self.app.update()
+        self.assertEqual(hud.display_value, 628)
+        self.app.change_scene("Game02")
+        self.assertEqual(hud.value, 0)
+        self.assertEqual(hud.display_value, 0)
+
+    def test_awards_during_active_animation_update_total_without_display_jumps(self):
+        hud = self.app.score_hud
+        self.app.add_score(200)
+        for _ in range(hud.ENTER_FRAMES + hud.MERGE_FRAMES + 1):
+            hud.update()
+        shown = hud.display_value
+        self.app.add_score(428)
+        self.assertEqual(hud.value, 628)
+        self.assertEqual(hud.display_value, shown)
+        previous = shown
+        while hud.animating:
+            hud.update()
+            self.assertGreaterEqual(hud.display_value, previous)
+            self.assertLessEqual(hud.display_value, hud.value)
+            previous = hud.display_value
+        self.assertEqual(hud.display_value, 628)
 
     def test_attack_sums_actual_scores_from_all_games(self):
         self.app.change_scene("Attack")

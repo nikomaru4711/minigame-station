@@ -9,11 +9,14 @@ class GameModule:
       self._score_awarded = False
 
     def award_clear_score(self, bonus=0):
-        """クリア基本点とボーナスを別々に予約し、二重加点を防ぐ。"""
+        self.award_score(200, bonus)
+
+    def award_score(self, base, bonus=0):
+        """基本点とボーナスを別々に予約し、二重加点を防ぐ。"""
         if self._score_awarded:
             return
         self._score_awarded = True
-        self.app.add_score(200)
+        self.app.add_score(base)
         if bonus > 0:
             self.app.add_score(bonus)
     
